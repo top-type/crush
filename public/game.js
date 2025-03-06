@@ -1058,14 +1058,12 @@ document.addEventListener('DOMContentLoaded', () => {
         targetScoreElement.textContent = targetScore;
         movesLeftElement.textContent = movesLeft;
         
-        // Select active symbols for this level
-        selectActiveSymbols();
-        
-        // Create new board
-        createBoard();
-        
         // Play level complete sound
         playSound(levelCompleteSound);
+        
+        // No longer recreate the board - keep the existing board state
+        // Select active symbols for this level - also removed to keep the same symbols
+        // createBoard();
     }
 
     // End the game
