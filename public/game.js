@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const levelScoreElement = document.getElementById('level-score');
     const nextLevelElement = document.getElementById('next-level');
     const continueButton = document.getElementById('continue-button');
+    const audioButton = document.getElementById('audio-button');
 
     // Audio elements
     const backgroundMusic = document.getElementById('background-music');
@@ -289,12 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTileClick(row, col) {
         if (isSwapping || isChecking || gameOver || movesLeft <= 0) return;
         
-        // Initialize background music on first user interaction
-        if (!musicInitialized) {
-            backgroundMusic.volume = 0.3;
-            backgroundMusic.play().catch(e => console.log("Audio play failed:", e));
-            musicInitialized = true;
-        }
+        // Initialize audio on user interaction
+        initAudio();
         
         const clickedTile = board[row][col];
         const tileElement = getTileElement(row, col);
@@ -2180,6 +2177,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Prevent default to avoid scrolling
         e.preventDefault();
         
+        // Initialize audio on user interaction
+        initAudio();
+        
         const touch = e.touches[0];
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
@@ -2187,13 +2187,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = parseInt(this.dataset.row);
         const col = parseInt(this.dataset.col);
         touchStartTile = board[row][col];
-        
-        // Initialize background music on first user interaction
-        if (!musicInitialized) {
-            backgroundMusic.volume = 0.3;
-            backgroundMusic.play().catch(e => console.log("Audio play failed:", e));
-            musicInitialized = true;
-        }
         
         // Visual feedback
         this.classList.add('selected');
@@ -2281,4 +2274,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize the game by fetching config from server
     fetchGameConfig();
+
+    // Add a function to initialize audio properly
+    function initAudio() {
+        if (musicInitialized) return;
+        
+        // Try to play background music
+        backgroundMusic.volume = 0.3;
+        
+        // On mobile, we need to play and pause immediately to "unlock" audio
+        const playPromise = backgroundMusic.play();
+        
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                console.log('Audio successfully initialized');
+                musicInitialized = true;
+            }).catch(error => {
+                console.log('Audio play failed, will retry on user interaction:', error);
+                
+                // Add a one-time click event listener to the document to initialize audio
+                const unlockAudio = () => {
+                    backgroundMusic.play().then(() => {
+                        console.log('Audio unlocked on user interaction');
+                        musicInitialized = true;
+                    }).catch(e => console.log('Audio still failed after user interaction:', e));
+                    
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
+                
+                document.addEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+            });
+        }
+    }
+
+    // Add a document-level click handler to initialize audio
+    document.addEventListener('click', initAudio, { once: true });
+    document.addEventListener('touchstart', initAudio, { once: true });
+
+    // Add audio button functionality
+    audioButton.addEventListener('click', () => {
+        initAudio();
+        
+        // Try to play the music directly
+        backgroundMusic.play().then(() => {
+            audioButton.textContent = '🔊 Music On';
+            musicInitialized = true;
+        }).catch(error => {
+            console.log('Audio play failed from button:', error);
+            audioButton.textContent = '🔇 Music Failed';
+        });
+    });
 });
