@@ -5,26 +5,22 @@ document.addEventListener('DOMContentLoaded', () => {
         cols: 8,
         symbols: ['👹', '💀', '🔥', '⛧', '🗡️', '🩸', '🐐', '🕯️'],
         activeSymbols: [], // Will be populated with a subset of symbols
-        activeSymbolCount: 6, // Number of symbols to use in the game
+        activeSymbolCount: 5, // Number of symbols to use in the game
         minMatch: 3,
         pointsPerTile: 10,
-        soulsPerMatch: 1,
         matchDelay: 500,
         fallDelay: 100,
         newTileDelay: 50,
         audioEnabled: true, // Always enable audio
         specialSymbols: {
             striped: {
-                points: 30,
-                souls: 2
+                points: 30
             },
             wrapped: {
-                points: 50,
-                souls: 3
+                points: 50
             },
             colorBomb: {
-                points: 100,
-                souls: 5
+                points: 100
             }
         }
     };
@@ -32,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Game state
     let board = [];
     let score = 0;
-    let souls = 0;
     let selectedTile = null;
     let isSwapping = false;
     let isChecking = false;
@@ -42,19 +37,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // DOM elements
     const boardElement = document.getElementById('board');
     const scoreElement = document.getElementById('score');
-    const soulsElement = document.getElementById('souls');
-    const gameOverElement = document.getElementById('game-over');
     const finalScoreElement = document.getElementById('final-score');
-    const finalSoulsElement = document.getElementById('final-souls');
+    const gameOverElement = document.getElementById('game-over');
     const restartButton = document.getElementById('restart-button');
-    const activeSymbolsElement = document.getElementById('active-symbols');
 
     // Audio elements
     const backgroundMusic = document.getElementById('background-music');
     const matchSound = document.getElementById('match-sound');
     const swapSound = document.getElementById('swap-sound');
-    const soulCollectSound = document.getElementById('soul-collect-sound');
     const gameOverSound = document.getElementById('game-over-sound');
+    const selectSound = document.getElementById('select-sound'); // Added select sound
     
     // Symbol-specific sound elements
     const symbolSounds = {
@@ -87,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset game state
         board = [];
         score = 0;
-        souls = 0;
         selectedTile = null;
         isSwapping = false;
         isChecking = false;
@@ -95,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update UI
         scoreElement.textContent = score;
-        soulsElement.textContent = souls;
         gameOverElement.classList.add('hidden');
         
         // Clear the board
@@ -200,7 +190,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (special === 'colorBomb') {
             tileElement.textContent = '';
         } else {
-            tileElement.textContent = symbol;
+            // Ensure the symbol is displayed
+            if (symbol) {
+                tileElement.textContent = symbol;
+            } else {
+                // If there's no symbol, make sure the tile is visually empty
+                tileElement.textContent = '';
+                tileElement.className = 'tile';
+                return tileElement;
+            }
         }
         
         // Add special class if this is a special tile
@@ -240,23 +238,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Select a random subset of symbols to use in the game
     function selectActiveSymbols() {
-        // Make a copy of the full symbols array
-        const allSymbols = [...config.symbols];
+        // Clear the active symbols array
         config.activeSymbols = [];
         
-        // Ensure we don't try to select more symbols than are available
-        const symbolCount = Math.min(config.activeSymbolCount, allSymbols.length);
+        // Create a copy of all symbols
+        const allSymbols = [...config.symbols];
         
         // Randomly select the specified number of symbols
-        for (let i = 0; i < symbolCount; i++) {
+        for (let i = 0; i < config.activeSymbolCount; i++) {
             const randomIndex = Math.floor(Math.random() * allSymbols.length);
             config.activeSymbols.push(allSymbols.splice(randomIndex, 1)[0]);
         }
         
         console.log("Active symbols for this game:", config.activeSymbols);
-        
-        // Update the active symbols display
-        activeSymbolsElement.textContent = config.activeSymbols.join(' ');
     }
 
     // Handle tile click
@@ -276,7 +270,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // If no tile is selected, select this one
         if (!selectedTile) {
             selectedTile = clickedTile;
+            
+            // Make sure the selected class is applied properly
             tileElement.classList.add('selected');
+            
+            // Play selection sound
+            playSound(selectSound);
             return;
         }
         
@@ -398,11 +397,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Check for matches on the board
-    function checkForMatches(matches = [], movedToTile) {
+    function checkForMatches(matches = null, movedToTile = null) {
         isChecking = true;
         
-        // If no matches are provided, find them
-        if (matches.length === 0) {
+        // If matches weren't provided, find them
+        if (!matches) {
             matches = findMatches();
         }
         
@@ -422,131 +421,105 @@ document.addEventListener('DOMContentLoaded', () => {
         // Play match sound
         playSound(matchSound);
         
-        // Mark matching tiles
+        // Create a set of all matched tile coordinates for quick lookup
+        const matchedCoords = new Set();
+        
+        // Check for special tiles in the matches
+        const specialTilesInMatches = [];
+        
         matches.forEach(match => {
             match.forEach(tile => {
+                matchedCoords.add(`${tile.row},${tile.col}`);
+                
+                // Mark matching tiles visually
                 const tileElement = getTileElement(tile.row, tile.col);
                 tileElement.classList.add('matching');
+                
+                // Check if this is a special tile
+                if (tile.special) {
+                    specialTilesInMatches.push(tile);
+                }
             });
         });
         
         // Calculate points
         const matchedTiles = matches.reduce((count, match) => count + match.length, 0);
         const points = matchedTiles * config.pointsPerTile;
-        const matchSouls = matches.length * config.soulsPerMatch;
         
-        // Update score and souls
+        // Update score
         score += points;
-        souls += matchSouls;
         scoreElement.textContent = score;
-        soulsElement.textContent = souls;
-        
-        // Play soul collect sound if souls were collected
-        if (matchSouls > 0) {
-            playSound(soulCollectSound);
-        }
         
         // Detect special patterns
         const specialTiles = detectSpecialPatterns(matches, movedToTile);
-        
-        // Collect all tiles to be removed
-        const tilesToRemove = [];
-        
-        // Find special tiles that are part of matches
-        const specialTilesToActivate = [];
-        matches.forEach(match => {
-            match.forEach(tile => {
-                if (tile.special) {
-                    specialTilesToActivate.push({
-                        row: tile.row,
-                        col: tile.col,
-                        symbol: tile.symbol,
-                        special: tile.special,
-                        direction: tile.direction
-                    });
-                }
-            });
-        });
         
         // Remove matches after a delay
         setTimeout(() => {
             // Create special tiles
             for (const specialTileInfo of specialTiles) {
                 // Only create a special tile if it's part of a match
-                let isPartOfMatch = false;
-                for (const match of matches) {
-                    for (const tile of match) {
-                        if (tile.row === specialTileInfo.row && tile.col === specialTileInfo.col) {
-                            isPartOfMatch = true;
-                            break;
-                        }
-                    }
-                    if (isPartOfMatch) break;
-                }
-                
-                if (isPartOfMatch) {
+                const coordKey = `${specialTileInfo.row},${specialTileInfo.col}`;
+                if (matchedCoords.has(coordKey)) {
                     // Create the special tile
                     const tile = board[specialTileInfo.row][specialTileInfo.col];
                     tile.special = specialTileInfo.special;
                     tile.direction = specialTileInfo.direction;
                     
-                    // Remove this tile from all matches so it doesn't get cleared
-                    for (const match of matches) {
-                        const index = match.findIndex(t => t.row === tile.row && t.col === tile.col);
-                        if (index !== -1) {
-                            match.splice(index, 1);
-                        }
-                    }
+                    // Remove this tile from the matched coordinates so it doesn't get cleared
+                    matchedCoords.delete(coordKey);
                     
                     // Update the tile element
                     updateTileElement(tile.row, tile.col, tile.symbol, tile.special, tile.direction);
+                    
+                    // Remove the matching animation
+                    const tileElement = getTileElement(tile.row, tile.col);
+                    tileElement.classList.remove('matching');
                 }
             }
             
-            // Activate special tiles that are part of matches
-            if (specialTilesToActivate.length > 0) {
-                // Sort by special type to prioritize more powerful effects
-                specialTilesToActivate.sort((a, b) => {
-                    const powerOrder = { 'colorBomb': 3, 'wrapped': 2, 'striped': 1 };
-                    return powerOrder[b.special] - powerOrder[a.special];
-                });
+            // First, activate any special tiles that are in matches
+            if (specialTilesInMatches.length > 0) {
+                let specialDelay = 0;
+                const activatedSpecials = new Set(); // Track which special tiles have been activated
                 
-                // Activate each special tile with a delay
-                let activationDelay = 0;
-                let maxActivationDelay = 0;
-                
-                for (const specialTile of specialTilesToActivate) {
-                    // Skip if this tile has already been cleared by a previous activation
-                    if (!board[specialTile.row][specialTile.col].symbol) continue;
+                specialTilesInMatches.forEach(tile => {
+                    const coordKey = `${tile.row},${tile.col}`;
                     
-                    setTimeout(() => {
-                        // Skip if this tile has been cleared during the delay
-                        if (!board[specialTile.row][specialTile.col].symbol) return;
+                    // Only activate if not already activated and not part of a new special tile
+                    if (!activatedSpecials.has(coordKey) && matchedCoords.has(coordKey)) {
+                        activatedSpecials.add(coordKey);
                         
-                        // Activate the special tile
-                        activateSpecialTile(board[specialTile.row][specialTile.col]);
-                    }, activationDelay);
-                    
-                    activationDelay += 300;
-                    maxActivationDelay = activationDelay;
-                }
-                
-                // If we activated any special tiles, return early
-                // The last activation will handle filling empty spaces
-                if (maxActivationDelay > 0) {
-                    return;
-                }
+                        // Remove from matched coords so it doesn't get cleared normally
+                        matchedCoords.delete(coordKey);
+                        
+                        // Activate with a delay
+                        setTimeout(() => {
+                            // Check if the tile still exists and has a special property
+                            if (board[tile.row] && board[tile.row][tile.col] && 
+                                board[tile.row][tile.col].special) {
+                                activateSpecialTile(board[tile.row][tile.col]);
+                            }
+                        }, specialDelay);
+                        
+                        specialDelay += 200;
+                    }
+                });
             }
             
-            // Collect all tiles to remove
-            matches.forEach(match => {
-                match.forEach(tile => {
+            // Collect all tiles to remove based on the matched coordinates
+            const tilesToRemove = [];
+            matchedCoords.forEach(coordKey => {
+                const [row, col] = coordKey.split(',').map(Number);
+                // Only add to removal list if the tile still has a symbol
+                if (board[row] && board[row][col] && board[row][col].symbol) {
                     tilesToRemove.push({
-                        row: tile.row,
-                        col: tile.col,
-                        symbol: tile.symbol
+                        row: row,
+                        col: col,
+                        symbol: board[row][col].symbol,
+                        special: board[row][col].special,
+                        direction: board[row][col].direction
                     });
-                });
+                }
             });
             
             // Remove matching tiles with animation
@@ -559,42 +532,96 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Clear tiles with a slight delay between each
                 let maxDelay = 0;
+                
+                // Process all tiles to remove at once to avoid race conditions
+                tilesToRemove.forEach(tile => {
+                    // Mark the tile as empty in the data model immediately
+                    // This prevents race conditions where a tile might be counted in multiple matches
+                    board[tile.row][tile.col].symbol = null;
+                    board[tile.row][tile.col].special = null;
+                    board[tile.row][tile.col].direction = null;
+                });
+                
+                // Now animate the removal
                 tilesToRemove.forEach((tile, index) => {
                     const delay = 50 + (index * 20);
                     maxDelay = Math.max(maxDelay, delay);
                     
                     setTimeout(() => {
-                        // Skip if this tile has been cleared by a special tile activation
-                        if (!board[tile.row][tile.col].symbol) return;
-                        
                         // Play the sound for the symbol being removed
                         playSymbolSound(tile.symbol);
                         
                         // Get the tile element
                         const tileElement = getTileElement(tile.row, tile.col);
+                        if (!tileElement) return; // Skip if element doesn't exist
                         
                         // Add special clear animation
                         tileElement.classList.add('special-clear');
                         
-                        // Mark the tile as empty
-                        board[tile.row][tile.col].symbol = null;
-                        board[tile.row][tile.col].special = null;
-                        board[tile.row][tile.col].direction = null;
-                        
                         // Clear the tile after animation
                         setTimeout(() => {
+                            if (!tileElement) return; // Skip if element doesn't exist
+                            
+                            // Ensure the tile is completely cleared
                             tileElement.textContent = '';
                             tileElement.className = 'tile';
+                            tileElement.style.transition = '';
+                            tileElement.style.transform = '';
+                            
+                            // Double-check that the board data is cleared
+                            if (board[tile.row] && board[tile.row][tile.col]) {
+                                board[tile.row][tile.col].symbol = null;
+                                board[tile.row][tile.col].special = null;
+                                board[tile.row][tile.col].direction = null;
+                            }
                         }, 300);
                     }, delay);
                 });
                 
                 // Fill empty spaces after all animations
                 setTimeout(() => {
+                    // Ensure all tiles are properly cleared before filling
+                    for (let row = 0; row < config.rows; row++) {
+                        for (let col = 0; col < config.cols; col++) {
+                            const tileElement = getTileElement(row, col);
+                            if (!tileElement) continue;
+                            
+                            // Remove any lingering animations
+                            tileElement.classList.remove('special-clear', 'matching');
+                            
+                            // If the board data says empty but the element still has content, clear it
+                            if (!board[row][col].symbol) {
+                                tileElement.textContent = '';
+                                tileElement.className = 'tile';
+                                tileElement.style.transition = '';
+                                tileElement.style.transform = '';
+                                
+                                // Remove any special indicators
+                                const existingIndicator = tileElement.querySelector('.special-indicator');
+                                if (existingIndicator) {
+                                    tileElement.removeChild(existingIndicator);
+                                }
+                            } else {
+                                // Ensure the visual state matches the data state
+                                updateTileElement(
+                                    row,
+                                    col,
+                                    board[row][col].symbol,
+                                    board[row][col].special,
+                                    board[row][col].direction
+                                );
+                            }
+                        }
+                    }
+                    
+                    // Run the global cleanup function to ensure all animations are cleared
+                    cleanupBoard();
+                    
                     fillEmptySpaces();
                 }, maxDelay + 400);
             } else {
                 // If no tiles to remove, check for matches
+                cleanupBoard();
                 fillEmptySpaces();
             }
         }, config.matchDelay);
@@ -651,9 +678,49 @@ document.addEventListener('DOMContentLoaded', () => {
         return matches;
     }
 
+    // Clean up any stuck animations or visual inconsistencies
+    function cleanupBoard() {
+        // Clear any lingering animations and ensure visual state matches data state
+        for (let row = 0; row < config.rows; row++) {
+            for (let col = 0; col < config.cols; col++) {
+                const tileElement = getTileElement(row, col);
+                if (!tileElement) continue;
+                
+                // Remove any lingering animations
+                tileElement.classList.remove('special-clear', 'matching');
+                
+                // If the board data says empty but the element still has content, clear it
+                if (!board[row][col].symbol) {
+                    tileElement.textContent = '';
+                    tileElement.className = 'tile';
+                    tileElement.style.transition = '';
+                    tileElement.style.transform = '';
+                    
+                    // Remove any special indicators
+                    const existingIndicator = tileElement.querySelector('.special-indicator');
+                    if (existingIndicator) {
+                        tileElement.removeChild(existingIndicator);
+                    }
+                } else {
+                    // Ensure the visual state matches the data state
+                    updateTileElement(
+                        row,
+                        col,
+                        board[row][col].symbol,
+                        board[row][col].special,
+                        board[row][col].direction
+                    );
+                }
+            }
+        }
+    }
+
     // Fill empty spaces with new tiles
     function fillEmptySpaces() {
         let hasEmptySpaces = false;
+        
+        // First, run cleanup to ensure all animations are cleared
+        cleanupBoard();
         
         // First, identify all empty spaces and tiles that need to fall
         const fallingTiles = [];
@@ -667,6 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let row = config.rows - 1; row >= 0; row--) {
                 if (board[row][col].symbol === null) {
                     emptySpaces++;
+                    hasEmptySpaces = true;
                 } else if (emptySpaces > 0) {
                     // This tile needs to fall
                     const newRow = row + emptySpaces;
@@ -682,20 +750,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         direction: board[row][col].direction,
                         distance: emptySpaces
                     });
-                    
-                    hasEmptySpaces = true;
                 }
             }
             
             // Record new tiles needed at the top
-            for (let row = emptySpaces - 1; row >= 0; row--) {
+            for (let i = 0; i < emptySpaces; i++) {
+                const row = i;
                 newTiles.push({
                     row: row,
                     col: col,
-                    distance: emptySpaces - row
+                    distance: emptySpaces - i
                 });
-                
-                hasEmptySpaces = true;
             }
         }
         
@@ -784,6 +849,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     const tileElement = getTileElement(row, col);
                     tileElement.style.transition = '';
                     tileElement.style.transform = '';
+                    
+                    // Ensure the visual state matches the data state
+                    if (board[row][col].symbol) {
+                        updateTileElement(
+                            row,
+                            col,
+                            board[row][col].symbol,
+                            board[row][col].special,
+                            board[row][col].direction
+                        );
+                    } else {
+                        // If there's no symbol, make sure the tile is visually empty
+                        tileElement.textContent = '';
+                        tileElement.className = 'tile';
+                    }
                 }
             }
             
@@ -855,7 +935,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function endGame() {
         gameOver = true;
         finalScoreElement.textContent = score;
-        finalSoulsElement.textContent = souls;
         gameOverElement.classList.remove('hidden');
         
         // Play game over sound
@@ -890,32 +969,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if this is a special combination (two special tiles)
         const isSpecialCombo = tile1Props.special && tile2Props.special;
         
-        // Check if this is a color bomb + any symbol combination
-        const isColorBombCombo = 
-            tile1Props.special === 'colorBomb' || 
-            tile2Props.special === 'colorBomb';
+        // Check if either tile is part of a match
+        const matches = findMatches();
+        const tile1InMatch = isInMatch(tile1, matches);
+        const tile2InMatch = isInMatch(tile2, matches);
         
-        // Special combinations always activate when player-initiated
-        // Only need to verify matches for single special tiles that aren't color bombs
-        const needsMatchCheck = 
-            !isSpecialCombo && 
-            !isColorBombCombo &&
-            (tile1Props.special === 'striped' || tile1Props.special === 'wrapped' ||
-             tile2Props.special === 'striped' || tile2Props.special === 'wrapped');
-        
-        if (needsMatchCheck) {
-            // Find matches to verify that the special tiles are part of a match
-            const matches = findMatches();
-            const tile1InMatch = isInMatch(tile1, matches);
-            const tile2InMatch = isInMatch(tile2, matches);
-            
-            // If neither special tile is in a match, just process the matches
-            if (!tile1InMatch && !tile2InMatch) {
-                checkForMatches(matches, movedToTile);
-                return;
-            }
-            
-            // If only one special tile is in a match, only activate that one
+        // If only one tile is in a match, activate its special effect and continue with the match
+        if (!isSpecialCombo) {
             if (tile1InMatch && !tile2InMatch) {
                 activateSpecialTile(tile1);
                 checkForMatches(matches, movedToTile);
@@ -969,37 +1029,32 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (tile1Props.special === 'striped') {
             // Striped + Regular: Clear row or column
             if (tile1Props.direction === 'horizontal') {
-                clearRow(sourceTile.row);
+                clearRow(tile1Props.row);
             } else {
-                clearColumn(sourceTile.col);
+                clearColumn(tile1Props.col);
             }
         }
         else if (tile2Props.special === 'striped') {
             // Regular + Striped: Clear row or column
             if (tile2Props.direction === 'horizontal') {
-                clearRow(sourceTile.row);
+                clearRow(tile2Props.row);
             } else {
-                clearColumn(sourceTile.col);
+                clearColumn(tile2Props.col);
             }
         }
         else if (tile1Props.special === 'wrapped') {
             // Wrapped + Regular: Double explosion
-            clearArea(sourceTile.row, sourceTile.col, 3);
+            clearArea(tile1Props.row, tile1Props.col, 3);
             setTimeout(() => {
-                clearArea(sourceTile.row, sourceTile.col, 3);
+                clearArea(tile1Props.row, tile1Props.col, 3);
             }, 300);
         }
         else if (tile2Props.special === 'wrapped') {
             // Regular + Wrapped: Double explosion
-            clearArea(sourceTile.row, sourceTile.col, 3);
+            clearArea(tile2Props.row, tile2Props.col, 3);
             setTimeout(() => {
-                clearArea(sourceTile.row, sourceTile.col, 3);
+                clearArea(tile2Props.row, tile2Props.col, 3);
             }, 300);
-        }
-        else {
-            // No special tiles or combination not handled
-            // This shouldn't happen, but just in case
-            checkForMatches([], movedToTile);
         }
     }
     
@@ -1007,11 +1062,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearTile(tile) {
         if (!tile) return;
         
+        // Store the row and col before clearing the tile
+        const row = tile.row;
+        const col = tile.col;
+        
+        // Clear the tile data
         tile.symbol = null;
         tile.special = null;
         tile.direction = null;
         
-        const tileElement = getTileElement(tile.row, tile.col);
+        // Clear the visual element
+        const tileElement = getTileElement(row, col);
+        if (!tileElement) return; // Skip if element doesn't exist
+        
+        // Remove any special classes and animations
+        tileElement.classList.remove('matching', 'special-clear', 'striped', 'wrapped', 'colorBomb', 'horizontal', 'vertical');
+        
+        // Remove any existing special indicators
+        const existingIndicator = tileElement.querySelector('.special-indicator');
+        if (existingIndicator) {
+            tileElement.removeChild(existingIndicator);
+        }
+        
         tileElement.textContent = '';
         tileElement.className = 'tile';
         tileElement.style.transition = '';
@@ -1047,7 +1119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         score += points;
         souls += soulsCollected;
         scoreElement.textContent = score;
-        soulsElement.textContent = souls;
         
         // Play soul collect sound
         playSound(soulCollectSound);
@@ -1106,674 +1177,74 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearColumn(col);
             }
         } else if (special === 'wrapped') {
-            // Wrapped: Explode in a 3×3 area, then again
-            clearArea(row, col, 3);
-            
-            // Second explosion after a delay
-            setTimeout(() => {
-                clearArea(row, col, 3);
-            }, 300);
+            // Wrapped: Clear a 3x3 area
+            clearArea(row, col, 1);
         } else if (special === 'colorBomb') {
-            // Color bomb: Should be handled in combination logic
-            // But if activated alone, clear a random symbol
-            const symbols = config.activeSymbols.length > 0 ? config.activeSymbols : config.symbols;
-            const activeSymbols = symbols.filter(s => {
-                // Find symbols that exist on the board
+            // Color Bomb: Clear all tiles of a random symbol
+            // If no symbol was provided, choose a random one
+            if (!symbol) {
+                const availableSymbols = [];
                 for (let r = 0; r < config.rows; r++) {
                     for (let c = 0; c < config.cols; c++) {
-                        if (board[r][c].symbol === s) return true;
+                        if (board[r][c].symbol && !availableSymbols.includes(board[r][c].symbol)) {
+                            availableSymbols.push(board[r][c].symbol);
+                        }
                     }
                 }
-                return false;
-            });
+                if (availableSymbols.length > 0) {
+                    symbol = availableSymbols[Math.floor(Math.random() * availableSymbols.length)];
+                }
+            }
             
-            if (activeSymbols.length > 0) {
-                const randomSymbol = activeSymbols[Math.floor(Math.random() * activeSymbols.length)];
-                clearAllOfSymbol(randomSymbol);
-            } else {
-                // If no symbols found, check for matches
-                setTimeout(() => {
-                    checkForMatches();
-                }, 300);
+            if (symbol) {
+                clearAllOfSymbol(symbol);
             }
         }
     }
     
     // Clear the entire board
     function clearEntireBoard() {
-        let points = 0;
-        let soulsCollected = 0;
-        
-        // Add a dramatic visual effect for the color bomb + color bomb combo
-        const boardRect = boardElement.getBoundingClientRect();
-        const explosionElement = document.createElement('div');
-        explosionElement.className = 'cross-explosion';
-        explosionElement.style.width = `${boardRect.width}px`;
-        explosionElement.style.height = `${boardRect.height}px`;
-        explosionElement.style.left = '0';
-        explosionElement.style.top = '0';
-        explosionElement.style.background = 'radial-gradient(circle, rgba(255,0,255,0.8) 0%, rgba(128,0,128,0.5) 50%, rgba(0,0,0,0) 100%)';
-        explosionElement.style.animation = 'cross-explosion 2s forwards';
-        boardElement.appendChild(explosionElement);
-        
-        // Add a pentagram overlay for the ritualistic effect
-        const pentagramElement = document.createElement('div');
-        pentagramElement.className = 'cross-explosion';
-        pentagramElement.style.width = `${boardRect.width}px`;
-        pentagramElement.style.height = `${boardRect.height}px`;
-        pentagramElement.style.left = '0';
-        pentagramElement.style.top = '0';
-        pentagramElement.style.display = 'flex';
-        pentagramElement.style.justifyContent = 'center';
-        pentagramElement.style.alignItems = 'center';
-        pentagramElement.style.fontSize = '150px';
-        pentagramElement.style.color = '#f0f';
-        pentagramElement.style.textShadow = '0 0 20px #f0f';
-        pentagramElement.style.animation = 'rotate-pentagram 2s linear forwards, cross-explosion 2s forwards';
-        pentagramElement.textContent = '⛧';
-        boardElement.appendChild(pentagramElement);
-        
-        // Remove the explosion elements after animation
-        setTimeout(() => {
-            boardElement.removeChild(explosionElement);
-            boardElement.removeChild(pentagramElement);
-        }, 2000);
-        
-        // Collect tiles in a specific order for better animation
+        // Find all tiles with symbols
         const tilesToClear = [];
         
-        // Collect tiles in a spiral pattern from the center
-        const centerRow = Math.floor(config.rows / 2);
-        const centerCol = Math.floor(config.cols / 2);
-        const maxRadius = Math.max(config.rows, config.cols);
-        
-        for (let radius = 0; radius <= maxRadius; radius++) {
-            // Collect tiles in a circle at this radius
-            for (let row = centerRow - radius; row <= centerRow + radius; row++) {
-                for (let col = centerCol - radius; col <= centerCol + radius; col++) {
-                    // Only include tiles at exactly this radius (on the perimeter)
-                    const distance = Math.max(Math.abs(row - centerRow), Math.abs(col - centerCol));
-                    if (distance === radius && row >= 0 && row < config.rows && col >= 0 && col < config.cols) {
-                        const tile = board[row][col];
-                        if (tile.symbol) {
-                            tilesToClear.push({
-                                row: row,
-                                col: col,
-                                symbol: tile.symbol,
-                                special: tile.special,
-                                distance: distance
-                            });
-                            
-                            // Add points and souls
-                            points += config.pointsPerTile * 3; // Triple points for this powerful combo
-                            soulsCollected++;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Update score and souls
-        score += points;
-        souls += soulsCollected;
-        scoreElement.textContent = score;
-        soulsElement.textContent = souls;
-        
-        // Play soul collect sound
-        playSound(soulCollectSound);
-        
-        // Clear tiles with animation
-        if (tilesToClear.length > 0) {
-            let maxDelay = 0;
-            tilesToClear.forEach((tile, index) => {
-                const delay = 500 + (tile.distance * 100); // Slower, more dramatic animation
-                maxDelay = Math.max(maxDelay, delay);
-                
-                setTimeout(() => {
-                    // Play the sound for the symbol being removed
-                    playSymbolSound(tile.symbol);
-                    
-                    // Get the tile element
-                    const tileElement = getTileElement(tile.row, tile.col);
-                    
-                    // Add special clear animation
-                    tileElement.classList.add('special-clear');
-                    
-                    // Mark the tile as empty
-                    board[tile.row][tile.col].symbol = null;
-                    board[tile.row][tile.col].special = null;
-                    board[tile.row][tile.col].direction = null;
-                    
-                    // Clear the tile after animation
-                    setTimeout(() => {
-                        tileElement.textContent = '';
-                        tileElement.className = 'tile';
-                    }, 500);
-                }, delay);
-            });
-            
-            // Fill empty spaces after all animations
-            setTimeout(() => {
-                fillEmptySpaces();
-            }, maxDelay + 600);
-        } else {
-            // If no tiles to clear, check for matches
-            setTimeout(() => {
-                checkForMatches();
-            }, 300);
-        }
-    }
-    
-    // Clear all tiles of a specific symbol
-    function clearAllOfSymbol(symbol) {
-        let points = 0;
-        let soulsCollected = 0;
-        let clearedTiles = 0;
-        const tilesToClear = [];
-        
-        // Add a visual effect for the color bomb + regular combo
-        const boardRect = boardElement.getBoundingClientRect();
-        const explosionElement = document.createElement('div');
-        explosionElement.className = 'cross-explosion';
-        explosionElement.style.width = `${boardRect.width}px`;
-        explosionElement.style.height = `${boardRect.height}px`;
-        explosionElement.style.left = '0';
-        explosionElement.style.top = '0';
-        explosionElement.style.background = `radial-gradient(circle, rgba(255,0,255,0.5) 0%, rgba(0,0,0,0) 70%)`;
-        explosionElement.style.animation = 'cross-explosion 1.5s forwards';
-        boardElement.appendChild(explosionElement);
-        
-        // Add a symbol overlay for the ritualistic effect
-        const symbolElement = document.createElement('div');
-        symbolElement.className = 'cross-explosion';
-        symbolElement.style.width = `${boardRect.width}px`;
-        symbolElement.style.height = `${boardRect.height}px`;
-        symbolElement.style.left = '0';
-        symbolElement.style.top = '0';
-        symbolElement.style.display = 'flex';
-        symbolElement.style.justifyContent = 'center';
-        symbolElement.style.alignItems = 'center';
-        symbolElement.style.fontSize = '150px';
-        symbolElement.style.color = '#f0f';
-        symbolElement.style.textShadow = '0 0 20px #f0f';
-        symbolElement.style.animation = 'pulse-glow 1.5s infinite alternate, cross-explosion 1.5s forwards';
-        symbolElement.textContent = symbol; // Show the symbol being cleared
-        boardElement.appendChild(symbolElement);
-        
-        // Remove the explosion elements after animation
-        setTimeout(() => {
-            boardElement.removeChild(explosionElement);
-            boardElement.removeChild(symbolElement);
-        }, 1500);
-        
-        // Find all tiles with the matching symbol
         for (let row = 0; row < config.rows; row++) {
             for (let col = 0; col < config.cols; col++) {
-                const tile = board[row][col];
-                
-                if (tile.symbol === symbol) {
-                    // Add to the list of tiles to clear
+                if (board[row][col].symbol) {
                     tilesToClear.push({
                         row: row,
                         col: col,
-                        symbol: tile.symbol,
-                        special: tile.special,
-                        // Calculate distance from center for animation timing
-                        distance: Math.sqrt(
-                            Math.pow(row - Math.floor(config.rows / 2), 2) + 
-                            Math.pow(col - Math.floor(config.cols / 2), 2)
-                        )
+                        symbol: board[row][col].symbol,
+                        special: board[row][col].special,
+                        direction: board[row][col].direction
                     });
-                    
-                    // Add points
-                    points += config.pointsPerTile * 2; // Double points for color bomb combo
-                    clearedTiles++;
                 }
             }
         }
         
-        // Calculate souls based on tiles cleared
-        soulsCollected = Math.ceil(clearedTiles / 2); // More souls for color bomb combo
-        
-        // Update score and souls
-        score += points;
-        souls += soulsCollected;
-        scoreElement.textContent = score;
-        soulsElement.textContent = souls;
-        
-        // Play soul collect sound
-        playSound(soulCollectSound);
-        
-        // Check for special tiles that need to be activated
-        const specialTilesToActivate = tilesToClear.filter(tile => tile.special);
-        
-        // Clear tiles with animation
-        if (tilesToClear.length > 0) {
-            // Sort by distance from center for better animation
-            tilesToClear.sort((a, b) => a.distance - b.distance);
-            
-            // Clear tiles with a delay based on distance
-            let maxDelay = 0;
-            tilesToClear.forEach((tile, index) => {
-                const delay = 100 + (tile.distance * 50);
-                maxDelay = Math.max(maxDelay, delay);
-                
-                setTimeout(() => {
-                    // Skip if this tile has already been cleared
-                    if (!board[tile.row][tile.col].symbol) return;
-                    
-                    // Play the sound for the symbol being removed
-                    playSymbolSound(tile.symbol);
-                    
-                    // Get the tile element
-                    const tileElement = getTileElement(tile.row, tile.col);
-                    
-                    // Add special clear animation
-                    tileElement.classList.add('special-clear');
-                    
-                    // Mark the tile as empty
-                    board[tile.row][tile.col].symbol = null;
-                    board[tile.row][tile.col].special = null;
-                    board[tile.row][tile.col].direction = null;
-                    
-                    // Clear the tile after animation
-                    setTimeout(() => {
-                        tileElement.textContent = '';
-                        tileElement.className = 'tile';
-                    }, 500);
-                }, delay);
-            });
-            
-            // Activate special tiles after clearing
-            if (specialTilesToActivate.length > 0) {
-                setTimeout(() => {
-                    let activationDelay = 0;
-                    
-                    for (const specialTile of specialTilesToActivate) {
-                        // Create a copy of the special tile for activation
-                        const tileCopy = { ...specialTile };
-                        
-                        setTimeout(() => {
-                            // Activate the special effect directly
-                            if (tileCopy.special === 'striped') {
-                                if (tileCopy.direction === 'horizontal') {
-                                    clearRow(tileCopy.row);
-                                } else {
-                                    clearColumn(tileCopy.col);
-                                }
-                            } else if (tileCopy.special === 'wrapped') {
-                                clearArea(tileCopy.row, tileCopy.col, 3);
-                                setTimeout(() => {
-                                    clearArea(tileCopy.row, tileCopy.col, 3);
-                                }, 300);
-                            } else if (tileCopy.special === 'colorBomb') {
-                                const symbols = config.activeSymbols.length > 0 ? config.activeSymbols : config.symbols;
-                                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-                                clearAllOfSymbol(randomSymbol);
-                            }
-                        }, activationDelay);
-                        
-                        activationDelay += 300;
-                    }
-                }, maxDelay + 100);
-                
-                // Don't fill empty spaces here, let the special tile activations handle it
-                return;
-            }
-            
-            // Fill empty spaces after all animations
+        // If no tiles to clear, return
+        if (tilesToClear.length === 0) {
             setTimeout(() => {
                 fillEmptySpaces();
-            }, maxDelay + 600);
-        } else {
-            // If no tiles to clear, check for matches
-            setTimeout(() => {
-                checkForMatches();
             }, 300);
-        }
-    }
-    
-    // Clear a row
-    function clearRow(row) {
-        let points = 0;
-        let soulsCollected = 0;
-        const tilesToClear = [];
-        
-        // First collect all tiles to clear
-        for (let col = 0; col < config.cols; col++) {
-            const tile = board[row][col];
-            
-            if (tile.symbol) {
-                // Add to the list of tiles to clear
-                tilesToClear.push({
-                    row: row,
-                    col: col,
-                    symbol: tile.symbol,
-                    special: tile.special,
-                    distance: Math.abs(col - Math.floor(config.cols / 2))
-                });
-                
-                // Add points
-                points += config.pointsPerTile;
-            }
+            return;
         }
         
-        // Calculate souls based on tiles cleared
-        soulsCollected = Math.ceil(config.cols / 3);
+        // Add bonus points for this powerful combo
+        const points = tilesToClear.length * config.pointsPerTile * 3; // Triple points for clearing the board
         
-        // Update score and souls
+        // Update score
         score += points;
-        souls += soulsCollected;
         scoreElement.textContent = score;
-        soulsElement.textContent = souls;
         
-        // Play soul collect sound
-        playSound(soulCollectSound);
-        
-        // Clear tiles with animation
-        if (tilesToClear.length > 0) {
-            // Sort by distance from center for better animation
-            tilesToClear.sort((a, b) => a.distance - b.distance);
-            
-            // Check for special tiles that need to be activated
-            const specialTilesToActivate = tilesToClear.filter(tile => tile.special && tile.special !== 'striped');
-            
-            // Clear tiles with a delay based on distance
-            let maxDelay = 0;
-            tilesToClear.forEach((tile, index) => {
-                const delay = 50 + (tile.distance * 30);
-                maxDelay = Math.max(maxDelay, delay);
-                
-                setTimeout(() => {
-                    // Skip if this tile has already been cleared
-                    if (!board[tile.row][tile.col].symbol) return;
-                    
-                    // Play the sound for the symbol being removed
-                    playSymbolSound(tile.symbol);
-                    
-                    // Get the tile element
-                    const tileElement = getTileElement(tile.row, tile.col);
-                    
-                    // Add special clear animation
-                    tileElement.classList.add('special-clear');
-                    
-                    // Mark the tile as empty
-                    board[tile.row][tile.col].symbol = null;
-                    board[tile.row][tile.col].special = null;
-                    board[tile.row][tile.col].direction = null;
-                    
-                    // Clear the tile after animation
-                    setTimeout(() => {
-                        tileElement.textContent = '';
-                        tileElement.className = 'tile';
-                    }, 500);
-                }, delay);
-            });
-            
-            // Activate special tiles after clearing the row
-            if (specialTilesToActivate.length > 0) {
-                setTimeout(() => {
-                    let activationDelay = 0;
-                    
-                    for (const specialTile of specialTilesToActivate) {
-                        // Create a copy of the special tile for activation
-                        const tileCopy = { ...specialTile };
-                        
-                        setTimeout(() => {
-                            // Activate the special effect directly
-                            if (tileCopy.special === 'wrapped') {
-                                clearArea(tileCopy.row, tileCopy.col, 3);
-                                setTimeout(() => {
-                                    clearArea(tileCopy.row, tileCopy.col, 3);
-                                }, 300);
-                            } else if (tileCopy.special === 'colorBomb') {
-                                const symbols = config.activeSymbols.length > 0 ? config.activeSymbols : config.symbols;
-                                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-                                clearAllOfSymbol(randomSymbol);
-                            }
-                        }, activationDelay);
-                        
-                        activationDelay += 300;
-                    }
-                }, maxDelay + 100);
-                
-                // Don't fill empty spaces here, let the special tile activations handle it
-                return;
-            }
-            
-            // Fill empty spaces after all animations
-            setTimeout(() => {
-                fillEmptySpaces();
-            }, maxDelay + 600);
-        } else {
-            // If no tiles to clear, check for matches
-            setTimeout(() => {
-                checkForMatches();
-            }, 300);
-        }
-    }
-    
-    // Clear a column
-    function clearColumn(col) {
-        let points = 0;
-        let soulsCollected = 0;
-        const tilesToClear = [];
-        
-        // First collect all tiles to clear
-        for (let row = 0; row < config.rows; row++) {
-            const tile = board[row][col];
-            
-            if (tile.symbol) {
-                // Add to the list of tiles to clear
-                tilesToClear.push({
-                    row: row,
-                    col: col,
-                    symbol: tile.symbol,
-                    special: tile.special,
-                    distance: Math.abs(row - Math.floor(config.rows / 2))
-                });
-                
-                // Add points
-                points += config.pointsPerTile;
-            }
-        }
-        
-        // Calculate souls based on tiles cleared
-        soulsCollected = Math.ceil(config.rows / 3);
-        
-        // Update score and souls
-        score += points;
-        souls += soulsCollected;
-        scoreElement.textContent = score;
-        soulsElement.textContent = souls;
-        
-        // Play soul collect sound
-        playSound(soulCollectSound);
-        
-        // Clear tiles with animation
-        if (tilesToClear.length > 0) {
-            // Sort by distance from center for better animation
-            tilesToClear.sort((a, b) => a.distance - b.distance);
-            
-            // Check for special tiles that need to be activated
-            const specialTilesToActivate = tilesToClear.filter(tile => tile.special && tile.special !== 'striped');
-            
-            // Clear tiles with a delay based on distance
-            let maxDelay = 0;
-            tilesToClear.forEach((tile, index) => {
-                const delay = 50 + (tile.distance * 30);
-                maxDelay = Math.max(maxDelay, delay);
-                
-                setTimeout(() => {
-                    // Skip if this tile has already been cleared
-                    if (!board[tile.row][tile.col].symbol) return;
-                    
-                    // Play the sound for the symbol being removed
-                    playSymbolSound(tile.symbol);
-                    
-                    // Get the tile element
-                    const tileElement = getTileElement(tile.row, tile.col);
-                    
-                    // Add special clear animation
-                    tileElement.classList.add('special-clear');
-                    
-                    // Mark the tile as empty
-                    board[tile.row][tile.col].symbol = null;
-                    board[tile.row][tile.col].special = null;
-                    board[tile.row][tile.col].direction = null;
-                    
-                    // Clear the tile after animation
-                    setTimeout(() => {
-                        tileElement.textContent = '';
-                        tileElement.className = 'tile';
-                    }, 500);
-                }, delay);
-            });
-            
-            // Activate special tiles after clearing the column
-            if (specialTilesToActivate.length > 0) {
-                setTimeout(() => {
-                    let activationDelay = 0;
-                    
-                    for (const specialTile of specialTilesToActivate) {
-                        // Create a copy of the special tile for activation
-                        const tileCopy = { ...specialTile };
-                        
-                        setTimeout(() => {
-                            // Activate the special effect directly
-                            if (tileCopy.special === 'wrapped') {
-                                clearArea(tileCopy.row, tileCopy.col, 3);
-                                setTimeout(() => {
-                                    clearArea(tileCopy.row, tileCopy.col, 3);
-                                }, 300);
-                            } else if (tileCopy.special === 'colorBomb') {
-                                const symbols = config.activeSymbols.length > 0 ? config.activeSymbols : config.symbols;
-                                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-                                clearAllOfSymbol(randomSymbol);
-                            }
-                        }, activationDelay);
-                        
-                        activationDelay += 300;
-                    }
-                }, maxDelay + 100);
-                
-                // Don't fill empty spaces here, let the special tile activations handle it
-                return;
-            }
-            
-            // Fill empty spaces after all animations
-            setTimeout(() => {
-                fillEmptySpaces();
-            }, maxDelay + 600);
-        } else {
-            // If no tiles to clear, check for matches
-            setTimeout(() => {
-                checkForMatches();
-            }, 300);
-        }
-    }
-    
-    // Clear both a row and column
-    function clearRowAndColumn(row, col) {
-        let points = 0;
-        let soulsCollected = 0;
-        let clearedTiles = 0;
-        
-        // Clear the row
-        for (let c = 0; c < config.cols; c++) {
-            const tile = board[row][c];
-            
-            if (tile.symbol) {
-                // Play the sound for the symbol being removed
-                playSymbolSound(tile.symbol);
-                
-                // Add points
-                points += config.pointsPerTile;
-                clearedTiles++;
-                
-                // Mark the tile as empty
-                tile.symbol = null;
-                tile.special = null;
-                tile.direction = null;
-                
-                // Update the tile element
-                const tileElement = getTileElement(row, c);
-                tileElement.textContent = '';
-                tileElement.className = 'tile special-clear';
-                
-                // Add animation
-                setTimeout(() => {
-                    tileElement.classList.remove('special-clear');
-                }, 500);
-            }
-        }
-        
-        // Clear the column
-        for (let r = 0; r < config.rows; r++) {
-            // Skip the intersection point to avoid counting it twice
-            if (r === row) continue;
-            
-            const tile = board[r][col];
-            
-            if (tile.symbol) {
-                // Play the sound for the symbol being removed
-                playSymbolSound(tile.symbol);
-                
-                // Add points
-                points += config.pointsPerTile;
-                clearedTiles++;
-                
-                // Mark the tile as empty
-                tile.symbol = null;
-                tile.special = null;
-                tile.direction = null;
-                
-                // Update the tile element
-                const tileElement = getTileElement(r, col);
-                tileElement.textContent = '';
-                tileElement.className = 'tile special-clear';
-                
-                // Add animation
-                setTimeout(() => {
-                    tileElement.classList.remove('special-clear');
-                }, 500);
-            }
-        }
-        
-        // Calculate souls based on tiles cleared
-        soulsCollected = Math.ceil(clearedTiles / 3);
-        
-        // Update score and souls
-        score += points;
-        souls += soulsCollected;
-        scoreElement.textContent = score;
-        soulsElement.textContent = souls;
-        
-        // Play soul collect sound
-        playSound(soulCollectSound);
-        
-        // Fill empty spaces
-        setTimeout(() => {
-            fillEmptySpaces();
-        }, config.matchDelay);
-    }
-    
-    // Clear a cross shape
-    function clearCrossShape(centerRow, centerCol) {
-        let points = 0;
-        let soulsCollected = 0;
-        let clearedTiles = 0;
-        const tilesToClear = [];
-        
-        // Add visual explosion effect
+        // Create a full-board explosion effect
         const boardRect = boardElement.getBoundingClientRect();
-        const tileSize = boardRect.width / config.cols;
         const explosionElement = document.createElement('div');
         explosionElement.className = 'cross-explosion';
-        explosionElement.style.left = `${centerCol * tileSize}px`;
-        explosionElement.style.top = `${centerRow * tileSize}px`;
-        explosionElement.style.width = `${tileSize}px`;
-        explosionElement.style.height = `${tileSize}px`;
+        explosionElement.style.width = `${boardRect.width}px`;
+        explosionElement.style.height = `${boardRect.height}px`;
+        explosionElement.style.left = '0';
+        explosionElement.style.top = '0';
+        explosionElement.style.background = 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,0,0,0.5) 50%, rgba(0,0,0,0) 100%)';
         boardElement.appendChild(explosionElement);
         
         // Remove the explosion element after animation
@@ -1781,218 +1252,107 @@ document.addEventListener('DOMContentLoaded', () => {
             boardElement.removeChild(explosionElement);
         }, 1000);
         
-        // First collect all tiles to clear in the row
-        for (let col = 0; col < config.cols; col++) {
-            const tile = board[centerRow][col];
+        // Identify special tiles to activate
+        const tilesToActivate = tilesToClear.filter(tile => tile.special);
+        
+        // Clear all tiles immediately
+        tilesToClear.forEach(tile => {
+            // Skip if this tile has already been cleared
+            if (!board[tile.row][tile.col].symbol) return;
             
-            if (tile.symbol) {
-                // Add to the list of tiles to clear
-                tilesToClear.push({
-                    row: centerRow,
-                    col: col,
-                    symbol: tile.symbol,
-                    special: tile.special,
-                    distance: Math.abs(col - centerCol)
-                });
-                
-                // Add points
-                points += config.pointsPerTile;
-                clearedTiles++;
+            // Clear the tile
+            clearTile(board[tile.row][tile.col]);
+            
+            // Add special clear animation
+            const tileElement = getTileElement(tile.row, tile.col);
+            if (tileElement) {
+                tileElement.classList.add('special-clear');
             }
-        }
+        });
         
-        // Then collect all tiles to clear in the column (except the center which is already counted)
-        for (let row = 0; row < config.rows; row++) {
-            if (row === centerRow) continue; // Skip the center row (already counted)
-            
-            const tile = board[row][centerCol];
-            
-            if (tile.symbol) {
-                // Add to the list of tiles to clear
-                tilesToClear.push({
-                    row: row,
-                    col: centerCol,
-                    symbol: tile.symbol,
-                    special: tile.special,
-                    distance: Math.abs(row - centerRow)
-                });
-                
-                // Add points
-                points += config.pointsPerTile;
-                clearedTiles++;
-            }
-        }
-        
-        // For wrapped-striped combo, add bonus points and souls
-        points *= 2; // Double the points for this powerful combo
-        
-        // Calculate souls based on tiles cleared
-        soulsCollected = Math.ceil(clearedTiles / 2); // More souls for this combo
-        
-        // Update score and souls
-        score += points;
-        souls += soulsCollected;
-        scoreElement.textContent = score;
-        soulsElement.textContent = souls;
-        
-        // Play soul collect sound
-        playSound(soulCollectSound);
-        
-        // Clear tiles with animation
-        if (tilesToClear.length > 0) {
-            // Sort by distance from center for better animation
-            tilesToClear.sort((a, b) => a.distance - b.distance);
-            
-            // Check for special tiles that need to be activated
-            const specialTilesToActivate = tilesToClear.filter(tile => tile.special);
-            
-            // Clear tiles with a delay based on distance
-            let maxDelay = 0;
-            tilesToClear.forEach((tile, index) => {
-                const delay = 50 + (tile.distance * 30);
-                maxDelay = Math.max(maxDelay, delay);
-                
+        // Activate the special tiles with a delay between each
+        if (tilesToActivate.length > 0) {
+            let delay = 100;
+            for (const tilePos of tilesToActivate) {
                 setTimeout(() => {
-                    // Skip if this tile has already been cleared
-                    if (!board[tile.row][tile.col].symbol) return;
-                    
-                    // Play the sound for the symbol being removed
-                    playSymbolSound(tile.symbol);
-                    
-                    // Get the tile element
-                    const tileElement = getTileElement(tile.row, tile.col);
-                    
-                    // Add special clear animation
-                    tileElement.classList.add('special-clear');
-                    
-                    // Mark the tile as empty
-                    board[tile.row][tile.col].symbol = null;
-                    board[tile.row][tile.col].special = null;
-                    board[tile.row][tile.col].direction = null;
-                    
-                    // Clear the tile after animation
-                    setTimeout(() => {
-                        tileElement.textContent = '';
-                        tileElement.className = 'tile';
-                    }, 500);
-                }, delay);
-            });
-            
-            // For wrapped-striped combo, do a second explosion after a delay
-            setTimeout(() => {
-                // Create a 3x3 explosion at the center
-                clearArea(centerRow, centerCol, 3);
-            }, maxDelay + 300);
-            
-            // Activate special tiles after clearing the cross
-            if (specialTilesToActivate.length > 0) {
-                setTimeout(() => {
-                    let activationDelay = 0;
-                    
-                    for (const specialTile of specialTilesToActivate) {
-                        // Create a copy of the special tile for activation
-                        const tileCopy = { ...specialTile };
-                        
-                        setTimeout(() => {
-                            // Activate the special effect directly
-                            if (tileCopy.special === 'striped') {
-                                if (tileCopy.direction === 'horizontal') {
-                                    clearRow(tileCopy.row);
-                                } else {
-                                    clearColumn(tileCopy.col);
-                                }
-                            } else if (tileCopy.special === 'wrapped') {
-                                clearArea(tileCopy.row, tileCopy.col, 3);
-                                setTimeout(() => {
-                                    clearArea(tileCopy.row, tileCopy.col, 3);
-                                }, 300);
-                            } else if (tileCopy.special === 'colorBomb') {
-                                const symbols = config.activeSymbols.length > 0 ? config.activeSymbols : config.symbols;
-                                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-                                clearAllOfSymbol(randomSymbol);
-                            }
-                        }, activationDelay);
-                        
-                        activationDelay += 300;
+                    if (board[tilePos.row][tilePos.col].special) {
+                        activateSpecialTile(board[tilePos.row][tilePos.col]);
                     }
-                }, maxDelay + 400);
-                
-                // Don't fill empty spaces here, let the special tile activations handle it
-                return;
+                }, delay);
+                delay += 100;
             }
-            
-            // Fill empty spaces after all animations
+        } else {
+            // Fill empty spaces after all tiles have been cleared
             setTimeout(() => {
                 fillEmptySpaces();
-            }, maxDelay + 700);
-        } else {
-            // If no tiles to clear, check for matches
-            setTimeout(() => {
-                checkForMatches();
-            }, 300);
+            }, delay + 300);
         }
     }
-
-    // Clear an area around a point
-    function clearArea(centerRow, centerCol, size) {
-        let points = 0;
-        let soulsCollected = 0;
-        let clearedTiles = 0;
+    
+    // Clear all tiles of a specific symbol
+    function clearAllOfSymbol(symbol) {
+        // Find all tiles with this symbol
         const tilesToClear = [];
         
-        const radius = Math.floor(size / 2);
-        
-        // First collect all tiles to clear
-        for (let r = centerRow - radius; r <= centerRow + radius; r++) {
-            for (let c = centerCol - radius; c <= centerCol + radius; c++) {
-                // Skip tiles outside the board
-                if (r < 0 || r >= config.rows || c < 0 || c >= config.cols) continue;
-                
-                const tile = board[r][c];
-                
-                if (tile.symbol) {
-                    // Add to the list of tiles to clear
+        for (let row = 0; row < config.rows; row++) {
+            for (let col = 0; col < config.cols; col++) {
+                if (board[row][col].symbol === symbol) {
                     tilesToClear.push({
-                        row: r,
-                        col: c,
-                        symbol: tile.symbol,
-                        special: tile.special,
-                        distance: Math.sqrt(Math.pow(r - centerRow, 2) + Math.pow(c - centerCol, 2))
+                        row: row,
+                        col: col,
+                        symbol: symbol,
+                        special: board[row][col].special,
+                        direction: board[row][col].direction
                     });
-                    
-                    // Add points
-                    points += config.pointsPerTile;
-                    clearedTiles++;
                 }
             }
         }
         
-        // Calculate souls based on tiles cleared
-        soulsCollected = Math.ceil(clearedTiles / 3);
+        // If no tiles found, return
+        if (tilesToClear.length === 0) {
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, 300);
+            return;
+        }
         
-        // Update score and souls
+        // Add points based on the number of tiles cleared
+        const points = tilesToClear.length * config.pointsPerTile * 2; // Double points for color bomb
+        
+        // Update score
         score += points;
-        souls += soulsCollected;
         scoreElement.textContent = score;
-        soulsElement.textContent = souls;
         
-        // Play soul collect sound
-        playSound(soulCollectSound);
+        // Create a cross-shaped explosion effect
+        const boardRect = boardElement.getBoundingClientRect();
+        const explosionElement = document.createElement('div');
+        explosionElement.className = 'cross-explosion';
+        explosionElement.style.width = `${boardRect.width}px`;
+        explosionElement.style.height = `${boardRect.height}px`;
+        explosionElement.style.left = '0';
+        explosionElement.style.top = '0';
+        explosionElement.style.background = 'radial-gradient(circle, rgba(255,0,255,0.5) 0%, rgba(0,0,0,0) 70%)';
+        boardElement.appendChild(explosionElement);
         
-        // Clear tiles with animation
-        if (tilesToClear.length > 0) {
-            // Sort by distance from center for better animation
-            tilesToClear.sort((a, b) => a.distance - b.distance);
-            
-            // Check for special tiles that need to be activated
-            const specialTilesToActivate = tilesToClear.filter(tile => tile.special);
-            
-            // Clear tiles with a delay based on distance
-            let maxDelay = 0;
-            tilesToClear.forEach((tile, index) => {
-                const delay = 50 + (tile.distance * 30);
-                maxDelay = Math.max(maxDelay, delay);
-                
+        // Remove the explosion element after animation
+        setTimeout(() => {
+            boardElement.removeChild(explosionElement);
+        }, 1000);
+        
+        // Clear the tiles with a delay between each
+        let delay = 0;
+        const specialTilesToActivate = [];
+        
+        // First, identify any special tiles to activate
+        tilesToClear.forEach(tile => {
+            if (tile.special) {
+                specialTilesToActivate.push(tile);
+            }
+        });
+        
+        // Clear regular tiles first
+        tilesToClear.forEach(tile => {
+            if (!tile.special) {
                 setTimeout(() => {
                     // Skip if this tile has already been cleared
                     if (!board[tile.row][tile.col].symbol) return;
@@ -2000,71 +1360,182 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Play the sound for the symbol being removed
                     playSymbolSound(tile.symbol);
                     
-                    // Get the tile element
-                    const tileElement = getTileElement(tile.row, tile.col);
+                    // Clear the tile
+                    clearTile(board[tile.row][tile.col]);
                     
                     // Add special clear animation
-                    tileElement.classList.add('special-clear');
-                    
-                    // Mark the tile as empty
-                    board[tile.row][tile.col].symbol = null;
-                    board[tile.row][tile.col].special = null;
-                    board[tile.row][tile.col].direction = null;
-                    
-                    // Clear the tile after animation
-                    setTimeout(() => {
-                        tileElement.textContent = '';
-                        tileElement.className = 'tile';
-                    }, 500);
-                }, delay);
-            });
-            
-            // Activate special tiles after clearing the area
-            if (specialTilesToActivate.length > 0) {
-                setTimeout(() => {
-                    let activationDelay = 0;
-                    
-                    for (const specialTile of specialTilesToActivate) {
-                        // Create a copy of the special tile for activation
-                        const tileCopy = { ...specialTile };
-                        
-                        setTimeout(() => {
-                            // Activate the special effect directly
-                            if (tileCopy.special === 'striped') {
-                                if (tileCopy.direction === 'horizontal') {
-                                    clearRow(tileCopy.row);
-                                } else {
-                                    clearColumn(tileCopy.col);
-                                }
-                            } else if (tileCopy.special === 'wrapped') {
-                                clearArea(tileCopy.row, tileCopy.col, 3);
-                                setTimeout(() => {
-                                    clearArea(tileCopy.row, tileCopy.col, 3);
-                                }, 300);
-                            } else if (tileCopy.special === 'colorBomb') {
-                                const symbols = config.activeSymbols.length > 0 ? config.activeSymbols : config.symbols;
-                                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-                                clearAllOfSymbol(randomSymbol);
-                            }
-                        }, activationDelay);
-                        
-                        activationDelay += 300;
+                    const tileElement = getTileElement(tile.row, tile.col);
+                    if (tileElement) {
+                        tileElement.classList.add('special-clear');
                     }
-                }, maxDelay + 100);
-                
-                // Don't fill empty spaces here, let the special tile activations handle it
-                return;
+                }, delay);
+                delay += 50;
             }
+        });
+        
+        // Then activate special tiles
+        if (specialTilesToActivate.length > 0) {
+            setTimeout(() => {
+                let specialDelay = 0;
+                specialTilesToActivate.forEach(tile => {
+                    setTimeout(() => {
+                        // Skip if this tile has already been cleared
+                        if (!board[tile.row] || !board[tile.row][tile.col] || !board[tile.row][tile.col].symbol) return;
+                        
+                        // Activate the special tile
+                        activateSpecialTile(board[tile.row][tile.col]);
+                    }, specialDelay);
+                    specialDelay += 200;
+                });
+            }, delay + 200);
             
-            // Fill empty spaces after all animations
+            // Fill empty spaces after all special tiles have been activated
             setTimeout(() => {
                 fillEmptySpaces();
-            }, maxDelay + 600);
+            }, delay + 200 + (specialTilesToActivate.length * 200) + 300);
         } else {
-            // If no tiles to clear, check for matches
+            // Fill empty spaces after all tiles have been cleared
             setTimeout(() => {
-                checkForMatches();
+                fillEmptySpaces();
+            }, delay + 300);
+        }
+    }
+
+    // Clear a cross shape (row and column)
+    function clearCrossShape(centerRow, centerCol) {
+        // Find all tiles in the cross shape
+        const tilesToClear = [];
+        
+        // Add tiles in the row
+        for (let col = 0; col < config.cols; col++) {
+            if (board[centerRow][col].symbol) {
+                tilesToClear.push({
+                    row: centerRow,
+                    col: col,
+                    symbol: board[centerRow][col].symbol,
+                    special: board[centerRow][col].special,
+                    direction: board[centerRow][col].direction
+                });
+            }
+        }
+        
+        // Add tiles in the column (except the center which is already counted)
+        for (let row = 0; row < config.rows; row++) {
+            if (row !== centerRow && board[row][centerCol].symbol) {
+                tilesToClear.push({
+                    row: row,
+                    col: centerCol,
+                    symbol: board[row][centerCol].symbol,
+                    special: board[row][centerCol].special,
+                    direction: board[row][centerCol].direction
+                });
+            }
+        }
+        
+        // If no tiles to clear, return
+        if (tilesToClear.length === 0) {
+            setTimeout(() => {
+                fillEmptySpaces();
             }, 300);
+            return;
+        }
+        
+        // Add points based on the number of tiles cleared
+        const points = tilesToClear.length * config.pointsPerTile * 2; // 2x points for cross shape
+        
+        // Update score
+        score += points;
+        scoreElement.textContent = score;
+        
+        // Create a cross-shaped explosion effect
+        const boardRect = boardElement.getBoundingClientRect();
+        const tileSize = boardRect.width / config.cols;
+        
+        // Horizontal part of the cross
+        const horizontalElement = document.createElement('div');
+        horizontalElement.className = 'cross-explosion';
+        horizontalElement.style.width = `${boardRect.width}px`;
+        horizontalElement.style.height = `${tileSize}px`;
+        horizontalElement.style.left = '0';
+        horizontalElement.style.top = `${centerRow * tileSize}px`;
+        horizontalElement.style.background = 'linear-gradient(to right, rgba(255,0,0,0) 0%, rgba(255,0,0,0.8) 50%, rgba(255,0,0,0) 100%)';
+        boardElement.appendChild(horizontalElement);
+        
+        // Vertical part of the cross
+        const verticalElement = document.createElement('div');
+        verticalElement.className = 'cross-explosion';
+        verticalElement.style.width = `${tileSize}px`;
+        verticalElement.style.height = `${boardRect.height}px`;
+        verticalElement.style.left = `${centerCol * tileSize}px`;
+        verticalElement.style.top = '0';
+        verticalElement.style.background = 'linear-gradient(to bottom, rgba(255,0,0,0) 0%, rgba(255,0,0,0.8) 50%, rgba(255,0,0,0) 100%)';
+        boardElement.appendChild(verticalElement);
+        
+        // Remove the explosion elements after animation
+        setTimeout(() => {
+            boardElement.removeChild(horizontalElement);
+            boardElement.removeChild(verticalElement);
+        }, 1000);
+        
+        // Clear the tiles with a delay between each
+        let delay = 0;
+        const specialTilesToActivate = [];
+        
+        // First, identify any special tiles to activate
+        tilesToClear.forEach(tile => {
+            if (tile.special) {
+                specialTilesToActivate.push(tile);
+            }
+        });
+        
+        // Clear regular tiles first
+        tilesToClear.forEach(tile => {
+            if (!tile.special) {
+                setTimeout(() => {
+                    // Skip if this tile has already been cleared
+                    if (!board[tile.row][tile.col].symbol) return;
+                    
+                    // Play the sound for the symbol being removed
+                    playSymbolSound(tile.symbol);
+                    
+                    // Clear the tile
+                    clearTile(board[tile.row][tile.col]);
+                    
+                    // Add special clear animation
+                    const tileElement = getTileElement(tile.row, tile.col);
+                    if (tileElement) {
+                        tileElement.classList.add('special-clear');
+                    }
+                }, delay);
+                delay += 50;
+            }
+        });
+        
+        // Then activate special tiles
+        if (specialTilesToActivate.length > 0) {
+            setTimeout(() => {
+                let specialDelay = 0;
+                specialTilesToActivate.forEach(tile => {
+                    setTimeout(() => {
+                        // Skip if this tile has already been cleared
+                        if (!board[tile.row] || !board[tile.row][tile.col] || !board[tile.row][tile.col].symbol) return;
+                        
+                        // Activate the special tile
+                        activateSpecialTile(board[tile.row][tile.col]);
+                    }, specialDelay);
+                    specialDelay += 200;
+                });
+            }, delay + 200);
+            
+            // Fill empty spaces after all special tiles have been activated
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, delay + 200 + (specialTilesToActivate.length * 200) + 300);
+        } else {
+            // Fill empty spaces after all tiles have been cleared
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, delay + 300);
         }
     }
 
@@ -2229,6 +1700,345 @@ document.addEventListener('DOMContentLoaded', () => {
             (isEndOfHorizontal && isMiddleOfVertical);
             
         return isLShape || isTShape;
+    }
+
+    // Clear both a row and column
+    function clearRowAndColumn(centerRow, centerCol) {
+        // This is essentially the same as clearCrossShape
+        clearCrossShape(centerRow, centerCol);
+    }
+
+    // Clear a row
+    function clearRow(row) {
+        // Find all tiles in this row
+        const tilesToClear = [];
+        
+        for (let col = 0; col < config.cols; col++) {
+            if (board[row][col].symbol) {
+                tilesToClear.push({
+                    row: row,
+                    col: col,
+                    symbol: board[row][col].symbol,
+                    special: board[row][col].special,
+                    direction: board[row][col].direction
+                });
+            }
+        }
+        
+        // If no tiles to clear, return
+        if (tilesToClear.length === 0) {
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, 300);
+            return;
+        }
+        
+        // Add points based on the number of tiles cleared
+        const points = tilesToClear.length * config.pointsPerTile * 1.5; // 1.5x points for striped
+        
+        // Update score
+        score += points;
+        scoreElement.textContent = score;
+        
+        // Create a row explosion effect
+        const boardRect = boardElement.getBoundingClientRect();
+        const tileSize = boardRect.width / config.cols;
+        
+        const rowElement = document.createElement('div');
+        rowElement.className = 'cross-explosion';
+        rowElement.style.width = `${boardRect.width}px`;
+        rowElement.style.height = `${tileSize}px`;
+        rowElement.style.left = '0';
+        rowElement.style.top = `${row * tileSize}px`;
+        rowElement.style.background = 'linear-gradient(to right, rgba(255,0,0,0) 0%, rgba(255,0,0,0.8) 50%, rgba(255,0,0,0) 100%)';
+        boardElement.appendChild(rowElement);
+        
+        // Remove the explosion element after animation
+        setTimeout(() => {
+            boardElement.removeChild(rowElement);
+        }, 1000);
+        
+        // Clear the tiles with a delay between each
+        let delay = 0;
+        const specialTilesToActivate = [];
+        
+        // First, identify any special tiles to activate
+        tilesToClear.forEach(tile => {
+            if (tile.special) {
+                specialTilesToActivate.push(tile);
+            }
+        });
+        
+        // Clear regular tiles first
+        tilesToClear.forEach(tile => {
+            if (!tile.special) {
+                setTimeout(() => {
+                    // Skip if this tile has already been cleared
+                    if (!board[tile.row][tile.col].symbol) return;
+                    
+                    // Play the sound for the symbol being removed
+                    playSymbolSound(tile.symbol);
+                    
+                    // Clear the tile
+                    clearTile(board[tile.row][tile.col]);
+                    
+                    // Add special clear animation
+                    const tileElement = getTileElement(tile.row, tile.col);
+                    if (tileElement) {
+                        tileElement.classList.add('special-clear');
+                    }
+                }, delay);
+                delay += 50;
+            }
+        });
+        
+        // Then activate special tiles
+        if (specialTilesToActivate.length > 0) {
+            setTimeout(() => {
+                let specialDelay = 0;
+                specialTilesToActivate.forEach(tile => {
+                    setTimeout(() => {
+                        // Skip if this tile has already been cleared
+                        if (!board[tile.row] || !board[tile.row][tile.col] || !board[tile.row][tile.col].symbol) return;
+                        
+                        // Activate the special tile
+                        activateSpecialTile(board[tile.row][tile.col]);
+                    }, specialDelay);
+                    specialDelay += 200;
+                });
+            }, delay + 200);
+            
+            // Fill empty spaces after all special tiles have been activated
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, delay + 200 + (specialTilesToActivate.length * 200) + 300);
+        } else {
+            // Fill empty spaces after all tiles have been cleared
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, delay + 300);
+        }
+    }
+    
+    // Clear a column
+    function clearColumn(col) {
+        // Find all tiles in this column
+        const tilesToClear = [];
+        
+        for (let row = 0; row < config.rows; row++) {
+            if (board[row][col].symbol) {
+                tilesToClear.push({
+                    row: row,
+                    col: col,
+                    symbol: board[row][col].symbol,
+                    special: board[row][col].special,
+                    direction: board[row][col].direction
+                });
+            }
+        }
+        
+        // If no tiles to clear, return
+        if (tilesToClear.length === 0) {
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, 300);
+            return;
+        }
+        
+        // Add points based on the number of tiles cleared
+        const points = tilesToClear.length * config.pointsPerTile * 1.5; // 1.5x points for striped
+        
+        // Update score
+        score += points;
+        scoreElement.textContent = score;
+        
+        // Create a column explosion effect
+        const boardRect = boardElement.getBoundingClientRect();
+        const tileSize = boardRect.width / config.cols;
+        
+        const colElement = document.createElement('div');
+        colElement.className = 'cross-explosion';
+        colElement.style.width = `${tileSize}px`;
+        colElement.style.height = `${boardRect.height}px`;
+        colElement.style.left = `${col * tileSize}px`;
+        colElement.style.top = '0';
+        colElement.style.background = 'linear-gradient(to bottom, rgba(255,0,0,0) 0%, rgba(255,0,0,0.8) 50%, rgba(255,0,0,0) 100%)';
+        boardElement.appendChild(colElement);
+        
+        // Remove the explosion element after animation
+        setTimeout(() => {
+            boardElement.removeChild(colElement);
+        }, 1000);
+        
+        // Clear the tiles with a delay between each
+        let delay = 0;
+        const specialTilesToActivate = [];
+        
+        // First, identify any special tiles to activate
+        tilesToClear.forEach(tile => {
+            if (tile.special) {
+                specialTilesToActivate.push(tile);
+            }
+        });
+        
+        // Clear regular tiles first
+        tilesToClear.forEach(tile => {
+            if (!tile.special) {
+                setTimeout(() => {
+                    // Skip if this tile has already been cleared
+                    if (!board[tile.row][tile.col].symbol) return;
+                    
+                    // Play the sound for the symbol being removed
+                    playSymbolSound(tile.symbol);
+                    
+                    // Clear the tile
+                    clearTile(board[tile.row][tile.col]);
+                    
+                    // Add special clear animation
+                    const tileElement = getTileElement(tile.row, tile.col);
+                    if (tileElement) {
+                        tileElement.classList.add('special-clear');
+                    }
+                }, delay);
+                delay += 50;
+            }
+        });
+        
+        // Then activate special tiles
+        if (specialTilesToActivate.length > 0) {
+            setTimeout(() => {
+                let specialDelay = 0;
+                specialTilesToActivate.forEach(tile => {
+                    setTimeout(() => {
+                        // Skip if this tile has already been cleared
+                        if (!board[tile.row] || !board[tile.row][tile.col] || !board[tile.row][tile.col].symbol) return;
+                        
+                        // Activate the special tile
+                        activateSpecialTile(board[tile.row][tile.col]);
+                    }, specialDelay);
+                    specialDelay += 200;
+                });
+            }, delay + 200);
+            
+            // Check for matches after all special tiles have been activated
+            setTimeout(() => {
+                checkForMatches();
+            }, delay + 200 + (specialTilesToActivate.length * 200) + 300);
+        } else {
+            // Check for matches after all tiles have been cleared
+            setTimeout(() => {
+                checkForMatches();
+            }, delay + 300);
+        }
+    }
+
+    // Clear an area
+    function clearArea(centerRow, centerCol, size) {
+        // Find all tiles in the area
+        const tilesToClear = [];
+        
+        const radius = Math.floor(size / 2);
+        
+        // Collect all tiles to clear
+        for (let r = centerRow - radius; r <= centerRow + radius; r++) {
+            for (let c = centerCol - radius; c <= centerCol + radius; c++) {
+                // Skip tiles outside the board
+                if (r < 0 || r >= config.rows || c < 0 || c >= config.cols) continue;
+                
+                if (board[r][c].symbol) {
+                    tilesToClear.push({
+                        row: r,
+                        col: c,
+                        symbol: board[r][c].symbol,
+                        special: board[r][c].special,
+                        direction: board[r][c].direction
+                    });
+                }
+            }
+        }
+        
+        // If no tiles to clear, return
+        if (tilesToClear.length === 0) {
+            setTimeout(() => {
+                fillEmptySpaces();
+            }, 300);
+            return;
+        }
+        
+        // Add points based on the number of tiles cleared
+        const points = tilesToClear.length * config.pointsPerTile * 2; // 2x points for area
+        
+        // Update score
+        score += points;
+        scoreElement.textContent = score;
+        
+        // Create an area explosion effect
+        const boardRect = boardElement.getBoundingClientRect();
+        const tileSize = boardRect.width / config.cols;
+        
+        // Remove the explosion element after animation
+        setTimeout(() => {
+            // Clear the tiles with a delay between each
+            let delay = 0;
+            const specialTilesToActivate = [];
+            
+            // First, identify any special tiles to activate
+            tilesToClear.forEach(tile => {
+                if (tile.special) {
+                    specialTilesToActivate.push(tile);
+                }
+            });
+            
+            // Clear regular tiles first
+            tilesToClear.forEach(tile => {
+                if (!tile.special) {
+                    setTimeout(() => {
+                        // Skip if this tile has already been cleared
+                        if (!board[tile.row][tile.col].symbol) return;
+                        
+                        // Play the sound for the symbol being removed
+                        playSymbolSound(tile.symbol);
+                        
+                        // Clear the tile
+                        clearTile(board[tile.row][tile.col]);
+                        
+                        // Add special clear animation
+                        const tileElement = getTileElement(tile.row, tile.col);
+                        if (tileElement) {
+                            tileElement.classList.add('special-clear');
+                        }
+                    }, delay);
+                    delay += 50;
+                }
+            });
+            
+            // Then activate special tiles
+            if (specialTilesToActivate.length > 0) {
+                setTimeout(() => {
+                    let specialDelay = 0;
+                    specialTilesToActivate.forEach(tile => {
+                        setTimeout(() => {
+                            // Skip if this tile has already been cleared
+                            if (!board[tile.row] || !board[tile.row][tile.col] || !board[tile.row][tile.col].symbol) return;
+                            
+                            // Activate the special tile
+                            activateSpecialTile(board[tile.row][tile.col]);
+                        }, specialDelay);
+                        specialDelay += 200;
+                    });
+                }, delay + 200);
+                
+                // Fill empty spaces after all special tiles have been activated
+                setTimeout(() => {
+                    fillEmptySpaces();
+                }, delay + 200 + (specialTilesToActivate.length * 200) + 300);
+            } else {
+                // Fill empty spaces after all tiles have been cleared
+                setTimeout(() => {
+                    fillEmptySpaces();
+                }, delay + 300);
+            }
+        }, 1000);
     }
 
     // Event listeners
