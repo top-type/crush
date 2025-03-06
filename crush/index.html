@@ -13,8 +13,16 @@
 <body>
     <div class="container">
         <h1>Crush</h1>
-        <div class="score-container">
-            <p>Score: <span id="score">0</span></p>
+        <div class="game-info">
+            <div class="info-item">
+                <p>Level: <span id="level">1</span></p>
+            </div>
+            <div class="info-item">
+                <p>Score: <span id="score">0</span> / <span id="target-score">1000</span></p>
+            </div>
+            <div class="info-item">
+                <p>Moves: <span id="moves-left">20</span></p>
+            </div>
         </div>
         <div class="game-container">
             <div id="board"></div>
@@ -23,8 +31,19 @@
     <div id="game-over" class="hidden">
         <div class="game-over-content">
             <h2>GAME OVER</h2>
-            <p>Final Score: <span id="final-score">0</span></p>
-            <button id="restart-button">Play Again</button>
+            <p>Score: <span id="final-score">0</span></p>
+            <p>Level Reached: <span id="final-level">1</span></p>
+            <button id="restart-button">Start New Ritual</button>
+        </div>
+    </div>
+    
+    <div id="level-complete" class="hidden">
+        <div class="level-complete-content">
+            <h2>SACRIFICE ACCEPTED</h2>
+            <p>Score: <span id="level-score">0</span></p>
+            <p>Advancing to Level <span id="next-level">2</span></p>
+            <div class="blood-drip"></div>
+            <button id="continue-button">Continue</button>
         </div>
     </div>
     
@@ -43,6 +62,9 @@
     </audio>
     <audio id="game-over-sound">
         <source src="https://freesound.org/data/previews/125/125981_2193953-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="level-complete-sound">
+        <source src="https://freesound.org/data/previews/399/399934_7646972-lq.mp3" type="audio/mpeg">
     </audio>
     
     <!-- Symbol-specific audio elements (preloaded) -->

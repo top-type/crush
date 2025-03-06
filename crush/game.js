@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fallDelay: 100,
         newTileDelay: 50,
         audioEnabled: true, // Always enable audio
+        movesPerLevel: 20, // Number of moves per level
+        baseTargetScore: 1000, // Base target score for level 1
+        targetScoreIncrease: 500, // How much the target score increases per level
         specialSymbols: {
             striped: {
                 points: 30
@@ -28,6 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Game state
     let board = [];
     let score = 0;
+    let totalScore = 0; // Total score across all levels
+    let level = 1; // Current level
+    let movesLeft = config.movesPerLevel; // Moves left in current level
+    let targetScore = config.baseTargetScore; // Target score for current level
     let selectedTile = null;
     let isSwapping = false;
     let isChecking = false;
@@ -37,16 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // DOM elements
     const boardElement = document.getElementById('board');
     const scoreElement = document.getElementById('score');
+    const levelElement = document.getElementById('level');
+    const movesLeftElement = document.getElementById('moves-left');
+    const targetScoreElement = document.getElementById('target-score');
     const finalScoreElement = document.getElementById('final-score');
+    const finalLevelElement = document.getElementById('final-level');
     const gameOverElement = document.getElementById('game-over');
     const restartButton = document.getElementById('restart-button');
+    const levelCompleteElement = document.getElementById('level-complete');
+    const levelScoreElement = document.getElementById('level-score');
+    const nextLevelElement = document.getElementById('next-level');
+    const continueButton = document.getElementById('continue-button');
 
     // Audio elements
     const backgroundMusic = document.getElementById('background-music');
     const matchSound = document.getElementById('match-sound');
     const swapSound = document.getElementById('swap-sound');
     const gameOverSound = document.getElementById('game-over-sound');
-    const selectSound = document.getElementById('select-sound'); // Added select sound
+    const selectSound = document.getElementById('select-sound');
+    const levelCompleteSound = document.getElementById('level-complete-sound');
     
     // Symbol-specific sound elements
     const symbolSounds = {
@@ -79,6 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset game state
         board = [];
         score = 0;
+        totalScore = 0;
+        level = 1;
+        movesLeft = config.movesPerLevel;
+        targetScore = config.baseTargetScore;
         selectedTile = null;
         isSwapping = false;
         isChecking = false;
@@ -86,49 +106,46 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update UI
         scoreElement.textContent = score;
+        levelElement.textContent = level;
+        movesLeftElement.textContent = movesLeft;
+        targetScoreElement.textContent = targetScore;
         gameOverElement.classList.add('hidden');
+        levelCompleteElement.classList.add('hidden');
         
-        // Clear the board
-        boardElement.innerHTML = '';
-        
-        // Select the active symbols for this game
+        // Select active symbols for this game
         selectActiveSymbols();
         
-        // Create the initial board
+        // Create the board
         createBoard();
-        
-        // Check for initial matches and fill the board
-        checkForMatches();
     }
 
-    // Create the initial game board
+    // Create the game board
     function createBoard() {
-        // Create a grid of tiles
+        // Clear the board
+        boardElement.innerHTML = '';
+        board = [];
+        
+        // Create the board data structure
         for (let row = 0; row < config.rows; row++) {
             board[row] = [];
             for (let col = 0; col < config.cols; col++) {
-                // Create a new tile with a random symbol
-                let symbol;
-                do {
-                    symbol = getRandomSymbol();
-                    board[row][col] = { 
-                        symbol, 
-                        row, 
-                        col,
-                        special: null,
-                        direction: null
-                    };
-                } while (
-                    // Avoid creating matches at the start
-                    (col >= 2 && board[row][col-1].symbol === symbol && board[row][col-2].symbol === symbol) ||
-                    (row >= 2 && board[row-1][col].symbol === symbol && board[row-2][col].symbol === symbol)
-                );
+                // Create a new tile
+                const symbol = getRandomSymbol();
+                board[row][col] = {
+                    row: row,
+                    col: col,
+                    symbol: symbol,
+                    special: null,
+                    direction: null
+                };
                 
                 // Create the tile element
-                const tile = createTileElement(row, col, symbol);
-                boardElement.appendChild(tile);
+                createTileElement(row, col, symbol);
             }
         }
+        
+        // Check for initial matches and fill the board
+        checkForMatches();
     }
 
     // Create a tile element
@@ -169,6 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Add event listeners
         tile.addEventListener('click', () => handleTileClick(row, col));
+        
+        // Add the tile to the board
+        boardElement.appendChild(tile);
         
         return tile;
     }
@@ -255,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle tile click
     function handleTileClick(row, col) {
-        if (isSwapping || isChecking || gameOver) return;
+        if (isSwapping || isChecking || gameOver || movesLeft <= 0) return;
         
         // Initialize background music on first user interaction
         if (!musicInitialized) {
@@ -292,13 +312,17 @@ document.addEventListener('DOMContentLoaded', () => {
             (Math.abs(selectedTile.col - col) === 1 && selectedTile.row === row)
         );
         
-        // If the tiles are not adjacent, select the new tile instead
+        // If not adjacent, deselect the current tile and select the new one
         if (!isAdjacent) {
             getTileElement(selectedTile.row, selectedTile.col).classList.remove('selected');
             selectedTile = clickedTile;
             tileElement.classList.add('selected');
             return;
         }
+        
+        // Decrement moves left
+        movesLeft--;
+        movesLeftElement.textContent = movesLeft;
         
         // Swap the tiles
         swapTiles(selectedTile, clickedTile);
@@ -415,6 +439,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 endGame();
             }
             
+            // Check if out of moves
+            if (movesLeft <= 0) {
+                endGame();
+            }
+            
             return;
         }
         
@@ -447,8 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = matchedTiles * config.pointsPerTile;
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Detect special patterns
         const specialTiles = detectSpecialPatterns(matches, movedToTile);
@@ -931,10 +959,72 @@ document.addEventListener('DOMContentLoaded', () => {
         return document.querySelector(`.tile[data-row="${row}"][data-col="${col}"]`);
     }
 
+    // Update score and check for level completion or game over
+    function updateScore(points) {
+        score += points;
+        totalScore += points;
+        scoreElement.textContent = score;
+        
+        // Check if level is complete
+        if (score >= targetScore) {
+            levelComplete();
+        } else if (movesLeft <= 0) {
+            // Check if game is over due to no moves left
+            endGame();
+        }
+    }
+    
+    // Level complete
+    function levelComplete() {
+        // Show level complete screen
+        levelCompleteElement.classList.remove('hidden');
+        
+        // Update level complete screen
+        levelScoreElement.textContent = score;
+        nextLevelElement.textContent = level + 1;
+        
+        // Play level complete sound
+        playSound(levelCompleteSound);
+    }
+    
+    // Start next level
+    function startNextLevel() {
+        // Store the current level's score for the level complete screen
+        const currentLevelScore = score;
+        
+        // Increment level
+        level++;
+        
+        // Reset score for the new level
+        score = 0;
+        
+        // Update target score
+        targetScore = config.baseTargetScore + (level - 1) * config.targetScoreIncrease;
+        
+        // Reset moves
+        movesLeft = config.movesPerLevel;
+        
+        // Update UI
+        scoreElement.textContent = score;
+        levelElement.textContent = level;
+        targetScoreElement.textContent = targetScore;
+        movesLeftElement.textContent = movesLeft;
+        
+        // Hide level complete screen
+        levelCompleteElement.classList.add('hidden');
+        
+        // Select active symbols for this level
+        selectActiveSymbols();
+        
+        // Create new board
+        createBoard();
+    }
+
     // End the game
     function endGame() {
         gameOver = true;
-        finalScoreElement.textContent = score;
+        finalScoreElement.textContent = totalScore;
+        finalLevelElement.textContent = level;
         gameOverElement.classList.remove('hidden');
         
         // Play game over sound
@@ -1116,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const soulsCollected = Math.ceil(tilesToActivate.length / 2);
         
         // Update score and souls
-        score += points;
+        updateScore(points);
         souls += soulsCollected;
         scoreElement.textContent = score;
         
@@ -1233,8 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = tilesToClear.length * config.pointsPerTile * 3; // Triple points for clearing the board
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Create a full-board explosion effect
         const boardRect = boardElement.getBoundingClientRect();
@@ -1285,7 +1374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fill empty spaces after all tiles have been cleared
             setTimeout(() => {
                 fillEmptySpaces();
-            }, delay + 300);
+            }, 300);
         }
     }
     
@@ -1320,8 +1409,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = tilesToClear.length * config.pointsPerTile * 2; // Double points for color bomb
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Create a cross-shaped explosion effect
         const boardRect = boardElement.getBoundingClientRect();
@@ -1444,8 +1532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = tilesToClear.length * config.pointsPerTile * 2; // 2x points for cross shape
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Create a cross-shaped explosion effect
         const boardRect = boardElement.getBoundingClientRect();
@@ -1737,8 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = tilesToClear.length * config.pointsPerTile * 1.5; // 1.5x points for striped
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Create a row explosion effect
         const boardRect = boardElement.getBoundingClientRect();
@@ -1849,8 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = tilesToClear.length * config.pointsPerTile * 1.5; // 1.5x points for striped
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Create a column explosion effect
         const boardRect = boardElement.getBoundingClientRect();
@@ -1969,8 +2054,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const points = tilesToClear.length * config.pointsPerTile * 2; // 2x points for area
         
         // Update score
-        score += points;
-        scoreElement.textContent = score;
+        updateScore(points);
         
         // Create an area explosion effect
         const boardRect = boardElement.getBoundingClientRect();
@@ -2043,6 +2127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event listeners
     restartButton.addEventListener('click', initGame);
+    continueButton.addEventListener('click', startNextLevel);
 
     // Start the game
     initGame();
