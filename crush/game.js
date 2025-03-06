@@ -38,11 +38,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const swapSound = document.getElementById('swap-sound');
     const soulCollectSound = document.getElementById('soul-collect-sound');
     const gameOverSound = document.getElementById('game-over-sound');
+    
+    // Symbol-specific sound elements
+    const symbolSounds = {
+        '👹': document.getElementById('demon-sound'),
+        '💀': document.getElementById('skull-sound'),
+        '🔥': document.getElementById('fire-sound'),
+        '⛧': document.getElementById('pentagram-sound'),
+        '🗡️': document.getElementById('knife-sound'),
+        '🩸': document.getElementById('blood-sound'),
+        '🐐': document.getElementById('goat-sound'),
+        '🕯️': document.getElementById('candle-sound')
+    };
 
     // Audio functions - simplified since we always have audio enabled
     function playSound(sound) {
         sound.currentTime = 0;
         sound.play().catch(e => console.log("Audio play failed:", e));
+    }
+    
+    // Play symbol-specific sound
+    function playSymbolSound(symbol) {
+        if (symbol && symbolSounds[symbol]) {
+            symbolSounds[symbol].volume = 0.4;
+            playSound(symbolSounds[symbol]);
+        }
     }
 
     // Initialize the game
@@ -254,6 +274,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Remove matching tiles
             matches.forEach(match => {
                 match.forEach(tile => {
+                    // Play the sound for the symbol being removed
+                    playSymbolSound(tile.symbol);
+                    
                     // Mark the tile as empty
                     tile.symbol = null;
                     
