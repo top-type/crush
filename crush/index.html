@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soul Crush Saga</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛧</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <h1>Soul Crush Saga</h1>
+        <div class="score-container">
+            <p>Score: <span id="score">0</span></p>
+            <p>Souls Collected: <span id="souls">0</span></p>
+        </div>
+        <div class="game-container">
+            <div id="board"></div>
+        </div>
+        <div class="info">
+            <p>Match 3 or more identical symbols to collect souls</p>
+        </div>
+        <div class="audio-controls">
+            <button id="toggle-audio">Toggle Audio</button>
+        </div>
+    </div>
+    <div id="game-over" class="hidden">
+        <div class="game-over-content">
+            <h2>RITUAL COMPLETE</h2>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <p>Souls Harvested: <span id="final-souls">0</span></p>
+            <button id="restart-button">Begin New Ritual</button>
+        </div>
+    </div>
+    
+    <!-- Audio elements -->
+    <audio id="background-music" loop>
+        <source src="sounds/crushbackground.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="match-sound">
+        <source src="https://freesound.org/data/previews/369/369952_6687700-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="swap-sound">
+        <source src="https://freesound.org/data/previews/240/240776_4107740-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="soul-collect-sound">
+        <source src="https://freesound.org/data/previews/415/415992_7866596-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="game-over-sound">
+        <source src="https://freesound.org/data/previews/125/125981_2193953-lq.mp3" type="audio/mpeg">
+    </audio>
+    
+    <script src="game.js"></script>
+</body>
+</html> 
