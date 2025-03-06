@@ -1317,8 +1317,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearColumn(col);
             }
         } else if (special === 'wrapped') {
-            // Wrapped: Clear a 3x3 area
-            clearArea(row, col, 1);
+            // Wrapped: Clear a 3x3 area (radius 1 means 3x3)
+            clearArea(row, col, 3);
+            
+            // After a short delay, clear the area again for the double explosion effect
+            setTimeout(() => {
+                clearArea(row, col, 3);
+            }, 300);
         } else if (special === 'colorBomb') {
             // Color Bomb: Clear all tiles of a random symbol
             // If no symbol was provided, choose a random one
