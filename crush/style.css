@@ -208,6 +208,8 @@ h1 {
     z-index: 2;
     transform: scale(1.05);
     animation: pulse-glow 1.5s infinite alternate;
+    background-color: #300;
+    color: transparent !important; /* Hide any text content */
 }
 
 @keyframes pulse-glow {
@@ -265,9 +267,41 @@ h1 {
 }
 
 .colorbomb-indicator {
-    background: radial-gradient(circle, rgba(255,0,255,0.8) 0%, rgba(255,0,255,0) 70%);
+    background: radial-gradient(circle at center, rgba(128, 0, 128, 0.7) 0%, rgba(0, 0, 0, 0) 70%);
     border-radius: 50%;
     animation: pulse-radial 1.5s infinite alternate;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.colorbomb-indicator::before {
+    content: "⛧";
+    color: #f0f;
+    text-shadow: 0 0 5px #f0f;
+    animation: rotate-pentagram 3s linear infinite;
+    font-size: 30px;
+}
+
+.colorbomb-indicator::after {
+    content: "";
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    border: 2px solid #f0f;
+    border-radius: 50%;
+    animation: pulse-border 1.5s infinite alternate;
+}
+
+@keyframes rotate-pentagram {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 @keyframes pulse-radial {
@@ -275,6 +309,7 @@ h1 {
     100% { transform: scale(1.2); opacity: 0.8; }
 }
 
+/* Special clear animations */
 .special-clear {
     animation: special-clear 0.5s forwards;
     z-index: 3;
@@ -295,5 +330,33 @@ h1 {
         transform: scale(0.5); 
         opacity: 0; 
         box-shadow: 0 0 40px #f00; 
+    }
+}
+
+/* Cross-shape explosion animation */
+.cross-explosion {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: radial-gradient(circle, rgba(255,136,0,0.8) 0%, rgba(255,0,0,0.5) 50%, rgba(255,0,0,0) 100%);
+    z-index: 10;
+    pointer-events: none;
+    animation: cross-explosion 1s forwards;
+}
+
+@keyframes cross-explosion {
+    0% { 
+        transform: scale(0); 
+        opacity: 0; 
+    }
+    50% {
+        transform: scale(1.5);
+        opacity: 0.8;
+    }
+    100% { 
+        transform: scale(3); 
+        opacity: 0; 
     }
 } 
