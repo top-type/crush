@@ -9,43 +9,6 @@ app.use(express.json());
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory storage for high scores
-let highScores = [];
-
-// API endpoint to get high scores
-app.get('/api/highscores', (req, res) => {
-  res.json(highScores);
-});
-
-// API endpoint to add a high score
-app.post('/api/highscores', (req, res) => {
-  const { name, score, level } = req.body;
-  
-  if (!name || !score) {
-    return res.status(400).json({ error: 'Name and score are required' });
-  }
-  
-  const newScore = {
-    id: Date.now(),
-    name,
-    score: Number(score),
-    level: Number(level) || 1,
-    date: new Date().toISOString()
-  };
-  
-  highScores.push(newScore);
-  
-  // Sort high scores in descending order
-  highScores.sort((a, b) => b.score - a.score);
-  
-  // Keep only top 10 scores
-  if (highScores.length > 10) {
-    highScores = highScores.slice(0, 10);
-  }
-  
-  res.status(201).json(newScore);
-});
-
 // API endpoint to get game configuration
 app.get('/api/config', (req, res) => {
   // This could be loaded from a database or configuration file

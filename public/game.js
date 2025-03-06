@@ -41,6 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameOver = false;
     let musicInitialized = false; // Flag to track if music has been initialized
 
+    // Touch tracking variables
+    let touchStartX = null;
+    let touchStartY = null;
+    let touchStartTile = null;
+    let isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
     // DOM elements
     const boardElement = document.getElementById('board');
     const scoreElement = document.getElementById('score');
@@ -150,47 +156,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create a tile element
     function createTileElement(row, col, symbol, special = null, direction = null) {
-        const tile = document.createElement('div');
-        tile.className = 'tile';
-        tile.dataset.row = row;
-        tile.dataset.col = col;
+        const tileElement = document.createElement('div');
+        tileElement.className = 'tile';
+        tileElement.dataset.row = row;
+        tileElement.dataset.col = col;
+        
+        // Add touch events for mobile
+        if (isTouchDevice) {
+            tileElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+            tileElement.addEventListener('touchmove', handleTouchMove, { passive: false });
+            tileElement.addEventListener('touchend', handleTouchEnd, { passive: false });
+        } else {
+            // Use click for non-touch devices
+            tileElement.addEventListener('click', () => {
+                handleTileClick(row, col);
+            });
+        }
         
         // For color bombs, use a fixed pentagram symbol
         if (special === 'colorBomb') {
-            tile.textContent = '';
+            tileElement.textContent = '';
         } else {
-            tile.textContent = symbol;
+            tileElement.textContent = symbol;
         }
         
         // Add special class if this is a special tile
         if (special) {
-            tile.classList.add(special);
+            tileElement.classList.add(special);
             if (direction) {
-                tile.classList.add(direction);
+                tileElement.classList.add(direction);
             }
             
-            // Add visual indicator for special tiles
+            // Add special indicator
             const specialIndicator = document.createElement('div');
-            specialIndicator.className = 'special-indicator';
             
             if (special === 'striped') {
-                specialIndicator.classList.add('striped-indicator', direction);
+                specialIndicator.className = `special-indicator striped-indicator ${direction}`;
             } else if (special === 'wrapped') {
-                specialIndicator.classList.add('wrapped-indicator');
+                specialIndicator.className = 'special-indicator wrapped-indicator';
             } else if (special === 'colorBomb') {
-                specialIndicator.classList.add('colorbomb-indicator');
+                specialIndicator.className = 'special-indicator colorbomb-indicator';
             }
             
-            tile.appendChild(specialIndicator);
+            tileElement.appendChild(specialIndicator);
         }
         
-        // Add event listeners
-        tile.addEventListener('click', () => handleTileClick(row, col));
-        
-        // Add the tile to the board
-        boardElement.appendChild(tile);
-        
-        return tile;
+        boardElement.appendChild(tileElement);
+        return tileElement;
     }
 
     // Update a tile element
@@ -1023,22 +1035,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // End the game
     function endGame() {
         gameOver = true;
+        
+        // Show game over screen
+        gameOverElement.classList.remove('hidden');
         finalScoreElement.textContent = totalScore;
         finalLevelElement.textContent = level;
-        gameOverElement.classList.remove('hidden');
         
         // Play game over sound
         if (config.audioEnabled) {
             playSound(gameOverSound);
         }
-        
-        // Prompt for player name and submit high score
-        setTimeout(() => {
-            const playerName = prompt('Enter your name for the high score:', 'Player');
-            if (playerName) {
-                submitHighScore(playerName, totalScore, level);
-            }
-        }, 1000);
     }
 
     // Handle special symbol combinations
@@ -2162,32 +2168,117 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Submit high score to server
-    async function submitHighScore(name, score, level) {
-        try {
-            const response = await fetch('/api/highscores', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ name, score, level })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to submit high score');
-            }
-            
-            const result = await response.json();
-            console.log('High score submitted:', result);
-            return result;
-        } catch (error) {
-            console.error('Error submitting high score:', error);
-            return null;
-        }
-    }
-
     // Initialize the game by fetching config from server
     fetchGameConfig();
     
     // ... rest of the existing code ...
-}); 
+
+    // Handle touch start
+    function handleTouchStart(e) {
+        if (isSwapping || isChecking || gameOver || movesLeft <= 0) return;
+        
+        // Prevent default to avoid scrolling
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        
+        const row = parseInt(this.dataset.row);
+        const col = parseInt(this.dataset.col);
+        touchStartTile = board[row][col];
+        
+        // Initialize background music on first user interaction
+        if (!musicInitialized) {
+            backgroundMusic.volume = 0.3;
+            backgroundMusic.play().catch(e => console.log("Audio play failed:", e));
+            musicInitialized = true;
+        }
+        
+        // Visual feedback
+        this.classList.add('selected');
+        
+        // Play selection sound
+        playSound(selectSound);
+    }
+
+    // Handle touch move
+    function handleTouchMove(e) {
+        if (!touchStartTile || isSwapping || isChecking || gameOver || movesLeft <= 0) return;
+        
+        // Prevent default to avoid scrolling
+        e.preventDefault();
+    }
+
+    // Handle touch end
+    function handleTouchEnd(e) {
+        if (!touchStartTile || isSwapping || isChecking || gameOver || movesLeft <= 0) {
+            // Reset touch tracking
+            touchStartX = null;
+            touchStartY = null;
+            touchStartTile = null;
+            
+            // Remove any selected class
+            document.querySelectorAll('.tile.selected').forEach(tile => {
+                tile.classList.remove('selected');
+            });
+            
+            return;
+        }
+        
+        // Prevent default
+        e.preventDefault();
+        
+        // Get the touch end position
+        const touch = e.changedTouches[0];
+        const touchEndX = touch.clientX;
+        const touchEndY = touch.clientY;
+        
+        // Calculate the swipe direction
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        
+        // Remove selected class
+        document.querySelectorAll('.tile.selected').forEach(tile => {
+            tile.classList.remove('selected');
+        });
+        
+        // Minimum swipe distance (in pixels)
+        const minSwipeDistance = 20;
+        
+        // Determine if it's a valid swipe
+        if (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance) {
+            // Determine the primary direction of the swipe
+            let targetRow = touchStartTile.row;
+            let targetCol = touchStartTile.col;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal swipe
+                targetCol += deltaX > 0 ? 1 : -1;
+            } else {
+                // Vertical swipe
+                targetRow += deltaY > 0 ? 1 : -1;
+            }
+            
+            // Check if the target position is valid
+            if (targetRow >= 0 && targetRow < config.rows && 
+                targetCol >= 0 && targetCol < config.cols) {
+                
+                // Decrement moves left
+                movesLeft--;
+                movesLeftElement.textContent = movesLeft;
+                
+                // Swap the tiles
+                swapTiles(touchStartTile, board[targetRow][targetCol]);
+            }
+        }
+        
+        // Reset touch tracking
+        touchStartX = null;
+        touchStartY = null;
+        touchStartTile = null;
+    }
+
+    // Initialize the game by fetching config from server
+    fetchGameConfig();
+});
