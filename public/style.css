@@ -12,25 +12,27 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: 10px;
+    height: 100vh;
+    overflow: hidden;
+    padding: 0;
 }
 
 .container {
-    text-align: center;
-    max-width: 600px;
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    padding: 20px;
-    background-color: rgba(0, 0, 0, 0.9);
-    border: 3px solid #222;
-    border-radius: 10px;
-    box-shadow: 0 0 20px #333, 0 0 30px #222 inset;
+    height: 100%;
+    max-width: 100%;
+    padding: 10px;
+    background-color: #000000;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 h1 {
-    font-size: 3rem;
-    margin-bottom: 20px;
+    font-size: 2.5rem;
+    margin: 5px 0;
     text-shadow: 0 0 10px #f00;
     letter-spacing: 2px;
 }
@@ -38,14 +40,14 @@ h1 {
 .game-info {
     display: flex;
     justify-content: space-around;
-    margin-bottom: 20px;
-    font-size: 1.3rem;
+    margin: 5px 0;
+    font-size: 1.2rem;
     flex-wrap: wrap;
 }
 
 .info-item {
-    margin: 5px;
-    padding: 5px 15px;
+    margin: 2px;
+    padding: 3px 10px;
     background-color: #300;
     border-radius: 5px;
     box-shadow: 0 0 10px #500 inset;
@@ -68,22 +70,28 @@ h1 {
 }
 
 .game-container {
+    flex: 1;
     display: flex;
     justify-content: center;
-    margin-bottom: 20px;
+    align-items: center;
+    margin: 5px 0;
     overflow: hidden;
 }
 
 #board {
     display: grid;
-    grid-template-columns: repeat(8, 60px);
-    grid-template-rows: repeat(8, 60px);
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
     gap: 2px;
     background-color: #300;
     padding: 5px;
     border-radius: 5px;
     box-shadow: 0 0 10px #600 inset;
-    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    max-width: min(100vh - 150px, 100vw - 20px);
+    max-height: min(100vh - 150px, 100vw - 20px);
+    aspect-ratio: 1 / 1;
 }
 
 .tile {
@@ -93,7 +101,7 @@ h1 {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 30px;
+    font-size: min(5vw, 5vh);
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     background-color: #200;
@@ -509,68 +517,43 @@ h1 {
 
 /* Mobile-specific styles */
 @media (max-width: 600px) {
-    body {
-        padding: 5px;
-    }
-    
-    .container {
-        padding: 10px;
-    }
-    
     h1 {
-        font-size: 2.5rem;
-        margin-bottom: 15px;
+        font-size: 2rem;
+        margin: 2px 0;
     }
     
     .game-info {
-        font-size: 1rem;
+        font-size: 0.9rem;
+        margin: 2px 0;
     }
     
     .info-item {
-        padding: 3px 10px;
-        margin: 3px;
+        padding: 2px 8px;
+        margin: 1px;
     }
     
     #board {
-        grid-template-columns: repeat(8, minmax(25px, 40px));
-        grid-template-rows: repeat(8, minmax(25px, 40px));
+        max-width: 100%;
+        max-height: calc(100vh - 100px);
     }
     
     .tile {
-        font-size: 20px;
-    }
-    
-    .high-scores-link {
-        top: 5px;
-        right: 5px;
-        padding: 5px 10px;
-        font-size: 14px;
-    }
-    
-    #restart-button, #continue-button {
-        padding: 8px 15px;
-        font-size: 16px;
-    }
-    
-    .game-over-content, .level-complete-content {
-        padding: 15px;
-        width: 90%;
+        font-size: min(6vw, 6vh);
     }
 }
 
 /* Small mobile devices */
 @media (max-width: 400px) {
     h1 {
-        font-size: 2rem;
+        font-size: 1.8rem;
+    }
+    
+    .game-info {
+        font-size: 0.8rem;
     }
     
     #board {
-        grid-template-columns: repeat(8, minmax(20px, 35px));
-        grid-template-rows: repeat(8, minmax(20px, 35px));
-    }
-    
-    .tile {
-        font-size: 18px;
+        max-height: calc(100vh - 90px);
     }
 }
 
