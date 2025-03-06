@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soul Crush Saga</title>
+    <title>Crush</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Soul Crush Saga</h1>
+        <h1>Crush</h1>
         <div class="score-container">
             <p>Score: <span id="score">0</span></p>
             <p>Souls Collected: <span id="souls">0</span></p>
@@ -20,19 +20,13 @@
         <div class="game-container">
             <div id="board"></div>
         </div>
-        <div class="info">
-            <p>Match 3 or more identical symbols to collect souls</p>
-        </div>
-        <div class="audio-controls">
-            <button id="toggle-audio">Toggle Audio</button>
-        </div>
     </div>
     <div id="game-over" class="hidden">
         <div class="game-over-content">
-            <h2>RITUAL COMPLETE</h2>
+            <h2>GAME OVER</h2>
             <p>Final Score: <span id="final-score">0</span></p>
-            <p>Souls Harvested: <span id="final-souls">0</span></p>
-            <button id="restart-button">Begin New Ritual</button>
+            <p>Souls Collected: <span id="final-souls">0</span></p>
+            <button id="restart-button">Play Again</button>
         </div>
     </div>
     

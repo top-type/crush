@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
         matchDelay: 500,
         fallDelay: 100,
         newTileDelay: 50,
-        audioEnabled: true
+        audioEnabled: true // Always enable audio
     };
 
     // Game state
@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalScoreElement = document.getElementById('final-score');
     const finalSoulsElement = document.getElementById('final-souls');
     const restartButton = document.getElementById('restart-button');
-    const toggleAudioButton = document.getElementById('toggle-audio');
 
     // Audio elements
     const backgroundMusic = document.getElementById('background-music');
@@ -40,28 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const soulCollectSound = document.getElementById('soul-collect-sound');
     const gameOverSound = document.getElementById('game-over-sound');
 
-    // Audio functions
-    function toggleAudio() {
-        config.audioEnabled = !config.audioEnabled;
-        
-        if (config.audioEnabled) {
-            // Only try to play if user has interacted with the page
-            if (musicInitialized) {
-                backgroundMusic.volume = 0.3;
-                backgroundMusic.play().catch(e => console.log("Audio play failed:", e));
-            }
-            toggleAudioButton.textContent = "Mute Sounds";
-        } else {
-            backgroundMusic.pause();
-            toggleAudioButton.textContent = "Enable Sounds";
-        }
-    }
-
+    // Audio functions - simplified since we always have audio enabled
     function playSound(sound) {
-        if (config.audioEnabled) {
-            sound.currentTime = 0;
-            sound.play();
-        }
+        sound.currentTime = 0;
+        sound.play().catch(e => console.log("Audio play failed:", e));
     }
 
     // Initialize the game
@@ -138,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isSwapping || isChecking || gameOver) return;
         
         // Initialize background music on first user interaction
-        if (!musicInitialized && config.audioEnabled) {
+        if (!musicInitialized) {
             backgroundMusic.volume = 0.3;
             backgroundMusic.play().catch(e => console.log("Audio play failed:", e));
             musicInitialized = true;
@@ -459,10 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event listeners
     restartButton.addEventListener('click', initGame);
-    toggleAudioButton.addEventListener('click', toggleAudio);
-
-    // Set initial audio button text based on config
-    toggleAudioButton.textContent = config.audioEnabled ? "Mute Sounds" : "Enable Sounds";
 
     // Start the game
     initGame();

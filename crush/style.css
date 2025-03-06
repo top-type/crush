@@ -6,8 +6,8 @@
 
 body {
     font-family: 'Creepster', cursive;
-    background-color: #0a0a0a;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path fill="%23300" d="M50 50 L100 0 L100 100 Z" /><path fill="%23300" d="M50 50 L0 0 L0 100 Z" /><path fill="%23300" d="M50 50 L0 100 L100 100 Z" /><path fill="%23300" d="M50 50 L0 0 L100 0 Z" /></svg>');
+    background-color: #000000;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path fill="%23111" d="M50 50 L100 0 L100 100 Z" /><path fill="%23111" d="M50 50 L0 0 L0 100 Z" /><path fill="%23111" d="M50 50 L0 100 L100 100 Z" /><path fill="%23111" d="M50 50 L0 0 L100 0 Z" /></svg>');
     color: #bb0000;
     display: flex;
     justify-content: center;
@@ -20,10 +20,10 @@ body {
     text-align: center;
     max-width: 600px;
     padding: 20px;
-    background-color: rgba(20, 0, 0, 0.9);
-    border: 3px solid #500;
+    background-color: rgba(0, 0, 0, 0.9);
+    border: 3px solid #222;
     border-radius: 10px;
-    box-shadow: 0 0 20px #f00, 0 0 30px #f00 inset;
+    box-shadow: 0 0 20px #333, 0 0 30px #222 inset;
 }
 
 h1 {
