@@ -132,12 +132,42 @@ document.addEventListener('DOMContentLoaded', () => {
         boardElement.innerHTML = '';
         board = [];
         
-        // Create the board data structure
+        // Create the board data structure with no initial matches
+        createBoardWithNoMatches();
+    }
+    
+    // Create a board with no initial matches
+    function createBoardWithNoMatches() {
+        // Initialize the board with random symbols
         for (let row = 0; row < config.rows; row++) {
             board[row] = [];
             for (let col = 0; col < config.cols; col++) {
-                // Create a new tile
-                const symbol = getRandomSymbol();
+                // Create a new tile with a random symbol
+                let symbol = getRandomSymbol();
+                
+                // Check if this would create a match horizontally
+                if (col >= 2) {
+                    // Check the two tiles to the left
+                    while (
+                        board[row][col-1].symbol === symbol && 
+                        board[row][col-2].symbol === symbol
+                    ) {
+                        symbol = getRandomSymbol();
+                    }
+                }
+                
+                // Check if this would create a match vertically
+                if (row >= 2) {
+                    // Check the two tiles above
+                    while (
+                        board[row-1][col].symbol === symbol && 
+                        board[row-2][col].symbol === symbol
+                    ) {
+                        symbol = getRandomSymbol();
+                    }
+                }
+                
+                // Create the tile with a valid symbol
                 board[row][col] = {
                     row: row,
                     col: col,
@@ -151,8 +181,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Check for initial matches and fill the board
-        checkForMatches();
+        // Verify no matches exist
+        const matches = findMatches();
+        if (matches.length > 0) {
+            console.log("Found matches after creation, recreating board");
+            // If matches still exist, try again (should be rare)
+            boardElement.innerHTML = '';
+            createBoardWithNoMatches();
+            return;
+        }
+        
+        // Check if there are possible moves
+        if (!hasPossibleMoves()) {
+            console.log("No possible moves on initial board, recreating");
+            // If no possible moves, recreate the board
+            boardElement.innerHTML = '';
+            createBoardWithNoMatches();
+        }
     }
 
     // Create a tile element
@@ -976,24 +1021,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Check if level is complete
         if (score >= targetScore) {
-            levelComplete();
+            // Automatically start next level instead of showing level complete screen
+            startNextLevel();
         } else if (movesLeft <= 0) {
             // Check if game is over due to no moves left
             endGame();
         }
     }
     
-    // Level complete
+    // Level complete - now just a placeholder function
     function levelComplete() {
-        // Show level complete screen
-        levelCompleteElement.classList.remove('hidden');
-        
-        // Update level complete screen
-        levelScoreElement.textContent = score;
-        nextLevelElement.textContent = level + 1;
-        
-        // Play level complete sound
-        playSound(levelCompleteSound);
+        // This function is kept for compatibility but no longer shows the level complete screen
+        console.log("Level " + level + " completed");
     }
     
     // Start next level
@@ -1019,14 +1058,14 @@ document.addEventListener('DOMContentLoaded', () => {
         targetScoreElement.textContent = targetScore;
         movesLeftElement.textContent = movesLeft;
         
-        // Hide level complete screen
-        levelCompleteElement.classList.add('hidden');
-        
         // Select active symbols for this level
         selectActiveSymbols();
         
         // Create new board
         createBoard();
+        
+        // Play level complete sound
+        playSound(levelCompleteSound);
     }
 
     // End the game
@@ -2140,7 +2179,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event listeners
     restartButton.addEventListener('click', initGame);
-    continueButton.addEventListener('click', startNextLevel);
+    // Remove the continue button event listener since level up is now automatic
+    // continueButton.addEventListener('click', startNextLevel);
 
     // Fetch game configuration from server
     async function fetchGameConfig() {
