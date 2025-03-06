@@ -2275,14 +2275,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the game by fetching config from server
     fetchGameConfig();
 
-    // Add a function to initialize audio properly
+    // Improve the audio initialization to be more aggressive
     function initAudio() {
         if (musicInitialized) return;
         
-        // Try to play background music
+        // Set volume
         backgroundMusic.volume = 0.3;
         
-        // On mobile, we need to play and pause immediately to "unlock" audio
+        // Try to play background music
         const playPromise = backgroundMusic.play();
         
         if (playPromise !== undefined) {
@@ -2292,38 +2292,39 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(error => {
                 console.log('Audio play failed, will retry on user interaction:', error);
                 
-                // Add a one-time click event listener to the document to initialize audio
+                // Add event listeners to the entire document to catch any user interaction
                 const unlockAudio = () => {
                     backgroundMusic.play().then(() => {
                         console.log('Audio unlocked on user interaction');
                         musicInitialized = true;
                     }).catch(e => console.log('Audio still failed after user interaction:', e));
-                    
-                    document.removeEventListener('click', unlockAudio);
-                    document.removeEventListener('touchstart', unlockAudio);
                 };
                 
-                document.addEventListener('click', unlockAudio);
-                document.addEventListener('touchstart', unlockAudio);
+                // Add listeners to various events to maximize chances of audio starting
+                document.addEventListener('click', unlockAudio, { once: true });
+                document.addEventListener('touchstart', unlockAudio, { once: true });
+                document.addEventListener('keydown', unlockAudio, { once: true });
+                document.addEventListener('mousedown', unlockAudio, { once: true });
+                
+                // Also try to start audio on any tile interaction
+                document.querySelectorAll('.tile').forEach(tile => {
+                    tile.addEventListener('click', unlockAudio, { once: true });
+                    tile.addEventListener('touchstart', unlockAudio, { once: true });
+                });
             });
         }
     }
 
-    // Add a document-level click handler to initialize audio
+    // Try to initialize audio as soon as possible
+    document.addEventListener('DOMContentLoaded', initAudio);
+    window.addEventListener('load', initAudio);
+
+    // Also try on first user interaction with the document
     document.addEventListener('click', initAudio, { once: true });
     document.addEventListener('touchstart', initAudio, { once: true });
+    document.addEventListener('keydown', initAudio, { once: true });
+    document.addEventListener('mousedown', initAudio, { once: true });
 
-    // Add audio button functionality
-    audioButton.addEventListener('click', () => {
-        initAudio();
-        
-        // Try to play the music directly
-        backgroundMusic.play().then(() => {
-            audioButton.textContent = '🔊 Music On';
-            musicInitialized = true;
-        }).catch(error => {
-            console.log('Audio play failed from button:', error);
-            audioButton.textContent = '🔇 Music Failed';
-        });
-    });
+    // Remove the audio button functionality since we removed the button
+    // ... rest of existing code ...
 });
